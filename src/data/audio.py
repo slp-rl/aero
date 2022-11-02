@@ -1,5 +1,6 @@
-# This code is based on FAIR's Demucs denoiser: https://github.com/facebookresearch/denoiser
-
+"""
+This code is based on Facebook's HDemucs code: https://github.com/facebookresearch/demucs
+"""
 import math
 import torchaudio
 from torch.nn import functional as F

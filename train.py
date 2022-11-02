@@ -1,3 +1,6 @@
+"""
+This code is based on Facebook's HDemucs code: https://github.com/facebookresearch/demucs
+"""
 import itertools
 import logging
 import os

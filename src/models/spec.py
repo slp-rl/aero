@@ -1,8 +1,6 @@
-# Copyright (c) Facebook, Inc. and its affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
+"""
+This code is based on Facebook's HDemucs code: https://github.com/facebookresearch/demucs
+"""
 """Conveniance wrapper to perform STFT and iSTFT"""
 
 import torch as th
