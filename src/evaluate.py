@@ -75,7 +75,6 @@ def evaluate_lr_hr_data(data, model, wandb_n_files_to_log, files_to_log, epoch, 
     hr_spec = model._spec(hr, scale=True)
     filename = Path(hr_path[0]).stem
 
-    # logger.info(f'evaluating on {filename}')
     if wandb_n_files_to_log == -1 or len(files_to_log) < wandb_n_files_to_log:
         files_to_log.append(filename)
 
@@ -86,7 +85,7 @@ def evaluate_lr_hr_data(data, model, wandb_n_files_to_log, files_to_log, epoch, 
 
     lsd_i, visqol_i = run_metrics(hr, pr, args, filename)
     if filename in files_to_log:
-        log_to_wandb(estimate_i, hr, lr, lsd_i, visqol_i,
+        log_to_wandb(pr, hr, lr, lsd_i, visqol_i,
                      filename, epoch, lr_sr, hr_sr, lr_spec.cpu(), pr_spec.cpu(), hr_spec.cpu())
 
     if enhance:
@@ -95,8 +94,7 @@ def evaluate_lr_hr_data(data, model, wandb_n_files_to_log, files_to_log, epoch, 
         save_wavs(pr, lr, hr, [os.path.join(args.samples_dir, filename)], lr_sr, args.experiment.hr_sr)
         save_specs(lr_spec, pr_spec, hr_spec, os.path.join(args.samples_dir, filename))
 
-    return {'pesq': pesq_i, 'stoi': stoi_i, 'snr': snr_i, 'lsd': lsd_i,
-            'sisnr': sisnr_i, 'visqol': visqol_i, 'filename': filename}
+    return {'lsd': lsd_i, 'visqol': visqol_i, 'filename': filename}
 
 
 def evaluate_on_saved_data(args, data_loader, epoch):
@@ -145,16 +143,10 @@ def evaluate_on_saved_data(args, data_loader, epoch):
 
 
 def evaluate(args, data_loader, epoch, model):
-    total_pesq = 0
-    total_stoi = 0
     total_lsd = 0
-    total_sisnr = 0
     total_visqol = 0
 
-    pesq_count = 0
-    stoi_count = 0
     lsd_count = 0
-    sisnr_count = 0
     visqol_count = 0
 
     total_cnt = 0
@@ -169,38 +161,20 @@ def evaluate(args, data_loader, epoch, model):
         for i, data in enumerate(iterator):
 
             metrics_i = evaluate_lr_hr_data(data, model, wandb_n_files_to_log, files_to_log, epoch, args)
-            total_pesq += metrics_i['pesq']
-            total_stoi += metrics_i['stoi']
             total_lsd += metrics_i['lsd']
-            total_sisnr += metrics_i['sisnr']
             total_visqol += metrics_i['visqol']
 
             total_filenames += metrics_i['filename']
 
-            pesq_count += 1 if metrics_i['pesq'] != 0 else 0
-            stoi_count += 1 if metrics_i['stoi'] != 0 else 0
             lsd_count += 1 if metrics_i['lsd'] != 0 else 0
-            sisnr_count += 1 if metrics_i['sisnr'] != 0 else 0
             visqol_count += 1 if metrics_i['visqol'] != 0 else 0
 
             total_cnt += 1
 
-    if pesq_count != 0:
-        avg_pesq, = distrib.average([total_pesq / pesq_count], total_pesq)
-    else:
-        avg_pesq = 0
-    if stoi_count != 0:
-        avg_stoi, = distrib.average([total_stoi / stoi_count], stoi_count)
-    else:
-        avg_stoi = 0
     if lsd_count != 0:
         avg_lsd, = distrib.average([total_lsd / lsd_count], lsd_count)
     else:
         avg_lsd = 0
-    if sisnr_count != 0:
-        avg_sisnr, = distrib.average([total_sisnr / sisnr_count], sisnr_count)
-    else:
-        avg_sisnr = 0
     if visqol_count != 0:
         avg_visqol, = distrib.average([total_visqol / visqol_count], visqol_count)
     else:
@@ -208,9 +182,9 @@ def evaluate(args, data_loader, epoch, model):
 
 
     logger.info(bold(
-        f'{args.experiment.name}, {args.experiment.lr_sr}->{args.experiment.hr_sr}. Test set performance:PESQ={avg_pesq} ({pesq_count}/{total_cnt}), STOI={avg_stoi} ({stoi_count}/{total_cnt}),'
-                                f'LSD={avg_lsd} ({lsd_count}/{total_cnt}), SISNR={avg_sisnr} ({sisnr_count}/{total_cnt}),VISQOL={avg_visqol} ({visqol_count}/{total_cnt}).'))
-    return avg_pesq, avg_stoi, avg_lsd, avg_sisnr, avg_visqol, total_filenames
+        f'{args.experiment.name}, {args.experiment.lr_sr}->{args.experiment.hr_sr}. Test set performance:'
+                                f'LSD={avg_lsd} ({lsd_count}/{total_cnt}), VISQOL={avg_visqol} ({visqol_count}/{total_cnt}).'))
+    return avg_lsd, avg_visqol, total_filenames
 
 
 def log_to_wandb(pr_signal, hr_signal, lr_signal, lsd, visqol, filename, epoch, lr_sr, hr_sr, lr_spec=None, pr_spec=None, hr_spec=None):
