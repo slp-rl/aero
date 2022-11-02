@@ -50,7 +50,6 @@ def create_subdirs_meta(subdirs_paths, n_samples_limit):
 
         meta = list(shared_meta)
         meta.sort()
-        print(n_samples_limit)
         if n_samples_limit:
             meta = meta[:n_samples_limit]
         return meta
