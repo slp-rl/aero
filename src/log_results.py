@@ -15,19 +15,6 @@ logger = logging.getLogger(__name__)
 
 SPECTOGRAM_EPSILON = 1e-13
 
-RESULTS_DF_FILENAME = 'filename'
-RESULTS_DF_LSD = 'lsd'
-RESULTS_DF_VISQOL = 'visqol'
-
-HISTOGRAM_DF_RANGE = 'range'
-HISTOGRAM_DF_N_SAMPLES = 'n_samples'
-HISTOGRAM_DF_AVG_LSD = 'avg lsd'
-HISTOGRAM_DF_AVG_VISQOL = 'avg visqol'
-
-DEFAULT_HISTOGRAM_MAX_SNR = 40.0
-
-WANDB_CUSTOM_CHART_NAME = "huji-dl-audio-lab/non-sorted-bar-chart"
-
 
 def create_wandb_table(args, data_loader, epoch):
     wandb_table = init_wandb_table()
