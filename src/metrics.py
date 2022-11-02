@@ -73,7 +73,8 @@ def get_lsd(ref_sig, out_sig):
     return (sp - st).square().mean(dim=1).sqrt().mean()
 
 
-# from: https://github.com/eagomez2/upf-smc-speech-enhancement-thesis/blob/main/src/utils/evaluation_process.py
+# based on: https://github.com/eagomez2/upf-smc-speech-enhancement-thesis/blob/main/src/utils/evaluation_process.py
+#TODO: avoid creating files when evaluating on previously enhanced files that already exist.
 def get_visqol(ref_sig, out_sig, filename, sr, speech_mode):
     tmp_reference = f"{filename}_ref.wav"
     tmp_estimation = f"{filename}_est.wav"
