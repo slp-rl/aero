@@ -57,7 +57,7 @@ optim: adam
 lr: 3e-4
 beta1: 0.8
 beta2: 0.999
-losses: [ l1 ]
+losses: [ stft ]
 stft_sc_factor: .5
 stft_mag_factor: .5
 epochs: 100

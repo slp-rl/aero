@@ -25,7 +25,7 @@ E.g. for 4 and 16 kHz: \
 
 ### Creating dummy egs files (for debugging code)
 If you want to create dummy egs files for debugging code on small number of samples.
-(This might be a little buggy, make sure that the same files exist in high/low resolution meta files)
+(This might be a little buggy, make sure that the same files exist in high/low resolution meta (egs) files)
 
 `python data_prep/create_meta_files.py <path for 4 kHz data> egs/vctk/4-16 lr --n_samples_limit=32` \
 `python data_prep/create_meta_files.py <path for 16 kHz data> egs/vctk/4-16 hr --n_samples_limit=32`

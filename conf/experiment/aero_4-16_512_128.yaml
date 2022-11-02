@@ -1,0 +1,76 @@
+# @package experiment
+name: aero-nfft=${experiment.nfft}-hl=${experiment.hop_length}
+
+# Dataset related
+lr_sr: 4000 # low resolution sample rate, added to support BWE. Should be included in training cfg
+hr_sr: 16000 # high resolution sample rate. Should be included in training cfg
+segment: 2
+stride: 2    # in seconds, how much to stride between training examples
+pad: true   # if training sample is too short, pad it
+upsample: false
+batch_size: 16
+nfft: 512
+hop_length: 128
+
+# models related
+model: aero
+aero: # see aero.py for a detailed description
+  in_channels: 1
+  out_channels: 1
+  # Channels
+  channels: 48
+  channels_time:
+  growth: 2
+  # STFT
+  nfft: ${experiment.nfft}
+  hop_length: ${experiment.hop_length}
+  wiener_iters: 0
+  end_iters: 0
+  wiener_residual: false
+  cac: true
+  # Main structure
+  rewrite: true
+  hybrid: false
+  hybrid_old: false
+  # Frequency Branch
+  multi_freqs: [ ]
+  multi_freqs_depth: 3
+  freq_emb: 0.2
+  emb_scale: 10
+  emb_smooth: true
+  # Convolutions
+  kernel_size: 8
+  strides: [ 4,4,2,2 ]
+  time_stride: 2
+  context: 1
+  context_enc: 0
+  freq_ends: 4
+  enc_freq_attn: 0
+  # normalization
+  norm_starts: 2
+  norm_groups: 4
+  # DConv residual branch
+  dconv_mode: 1
+  dconv_depth: 2
+  dconv_comp: 4
+  dconv_time_attn: 2
+  dconv_lstm: 2
+  dconv_init: 1e-3
+  # Weight init
+  rescale: 0.1
+  lr_sr: ${experiment.lr_sr}
+  hr_sr: ${experiment.hr_sr}
+  spec_upsample: true
+  act_func: snake
+  debug: false
+
+adversarial: True
+features_loss_lambda: 100
+only_features_loss: False
+only_adversarial_loss: False
+discriminator_model: melgan #melgan/hifi/stft
+melgan_discriminator:
+  n_layers: 4
+  num_D: 3
+  downsampling_factor: 4
+  ndf: 16
