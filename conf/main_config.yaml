@@ -50,6 +50,7 @@ wandb:
   log: all # gradients/parameters/all/None
   log_freq: 5
   n_files_to_log: 10 # number or -1 for all files
+  n_files_to_log_to_table: 20 # TODO: implement usage.
   tags: [ ]
   resume: true
 

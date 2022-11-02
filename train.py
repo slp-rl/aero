@@ -19,7 +19,7 @@ from src.utils import print_network
 logger = logging.getLogger(__name__)
 
 WANDB_PROJECT_NAME = 'Spectral Bandwidth Extension'
-WANDB_ENTITY = 'huji-dl-audio-lab'
+WANDB_ENTITY = 'huji-dl-audio-lab' # TODO: more to args/ user input
 
 
 def run(args):

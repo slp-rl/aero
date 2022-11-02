@@ -19,8 +19,8 @@ from src.utils import LogProgress, bold, convert_spectrogram_to_heatmap
 
 logger = logging.getLogger(__name__)
 
-WANDB_PROJECT_NAME = 'Bandwidth Extension'
-WANDB_ENTITY = 'huji-dl-audio-lab'
+WANDB_PROJECT_NAME = 'Spectral Bandwidth Extension'
+WANDB_ENTITY = 'huji-dl-audio-lab' # TODO: move to args/user input
 
 
 
@@ -109,7 +109,6 @@ def evaluate_on_saved_data(args, data_loader, epoch):
 
     files_to_log = []
     wandb_n_files_to_log = args.wandb.n_files_to_log if 'wandb' in args else args.wandb_n_files_to_log
-    hr_sr = args.experiment.hr_sr if 'experiment' in args else args.hr_sr
 
     with torch.no_grad():
         iterator = LogProgress(logger, data_loader, name="Eval estimates")
@@ -239,6 +238,7 @@ def log_to_wandb(pr_signal, hr_signal, lr_signal, lsd, visqol, filename, epoch, 
     wandb.log(wandb_dict,
               step=epoch)
 
+#TODO: remove following code. after implementing from test.py?
 
 def get_parser():
     parser = argparse.ArgumentParser()
