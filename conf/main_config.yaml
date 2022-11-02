@@ -35,6 +35,7 @@ dummy: '' # use this if you want twice the same exp, with a different name
 
 # Evaluation stuff
 visqol: True # compute visqol?
+visqol_path: # fill from install_visqol.sh script
 eval_every: 10  # compute test metrics every so epochs
 enhance_samples_limit: -1
 valid_equals_test: # whether valid_dset == test_dset, set in train.py script

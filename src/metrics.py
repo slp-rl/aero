@@ -15,7 +15,7 @@ from src.models.stft_loss import stft
 
 logger = logging.getLogger(__name__)
 
-VISQOL_PATH = "/cs/labs/adiyoss/moshemandel/visqol-master; "
+VISQOL_PATH = "/cs/labs/adiyoss/moshemandel/visqol-master; " #TODO: change to args.visqol_path from config file
 SLEEP_DURATION = 0.1
 VISQOL_MIN_DURATION = 0.48
 
@@ -31,70 +31,10 @@ def get_metrics(clean, estimate, sr, filename, speech_mode, calc_visqol=True):
     estimate = estimate.squeeze(dim=1)
     estimate_numpy = estimate.numpy()
     clean_numpy = clean.numpy()
-    # pesq = get_pesq(clean_numpy, estimate_numpy, sr=sr)
-    # stoi = get_stoi(clean_numpy, estimate_numpy, sr=sr)
-    pesq = 0
-    stoi = 0
-    snr = get_snr(clean_numpy, estimate_numpy)
+
     lsd = get_lsd(clean, estimate).item()
-    sisnr = get_sisnr(clean_numpy, estimate_numpy)
     visqol = get_visqol(clean_numpy, estimate_numpy, filename, sr, speech_mode) if calc_visqol else 0
     return lsd, visqol
-
-
-def get_pesq(ref_sig, out_sig, sr):
-    """Calculate PESQ.
-    Args:
-        ref_sig: numpy.ndarray, [B, T]
-        out_sig: numpy.ndarray, [B, T]
-    Returns:
-        PESQ
-    """
-    pesq_val = 0
-    if sr not in [8000, 16000]:
-        return pesq_val
-    for i in range(len(ref_sig)):
-        mode = 'wb' if sr == 16000 else 'nb'
-        tmp = pesq(sr, ref_sig[i], out_sig[i], mode)  # from pesq
-        pesq_val += tmp
-    return pesq_val
-
-
-def get_stoi(ref_sig, out_sig, sr):
-    """Calculate STOI.
-    Args:
-        ref_sig: numpy.ndarray, [B, T]
-        out_sig: numpy.ndarray, [B, T]
-    Returns:
-        STOI
-    """
-    stoi_val = 0
-    for i in range(len(ref_sig)):
-        stoi_val += stoi(ref_sig[i], out_sig[i], sr, extended=True)
-    return stoi_val
-
-
-# get_snr and get_lsd are taken from: https://github.com/nanahou/metric/blob/master/measure_SNR_LSD.py
-def get_snr(ref_sig, out_sig):
-    """
-       Compute SNR (signal to noise ratio)
-       Arguments:
-           out_sig: vector (torch.Tensor), enhanced signal [B,T]
-           ref_sig: vector (torch.Tensor), reference signal(ground truth) [B,T]
-    """
-
-    ref = np.power(ref_sig, 2)
-    diff = np.power(out_sig - ref_sig, 2)
-    if abs(np.sum(diff, axis=-1)) > 0:
-        ratio = np.sum(ref, axis=-1) / np.sum(diff, axis=-1)
-        value = 10 * np.log10(ratio)
-        return value
-    elif abs(np.sum(ref, axis=-1)) > 0:
-        ratio = np.sum(ref, axis=-1)
-        value = 10 * np.log10(ratio)
-        return value
-    else:
-        return 0
 
 
 class STFTMag(nn.Module):
@@ -118,7 +58,7 @@ class STFTMag(nn.Module):
         mag = torch.norm(stft, p=2, dim=-1)  # [B, F, TT]
         return mag
 
-
+# taken from: https://github.com/nanahou/metric/blob/master/measure_SNR_LSD.py
 def get_lsd(ref_sig, out_sig):
     """
        Compute LSD (log spectral distance)
@@ -131,27 +71,6 @@ def get_lsd(ref_sig, out_sig):
     sp = torch.log10(stft(ref_sig).square().clamp(1e-8))
     st = torch.log10(stft(out_sig).square().clamp(1e-8))
     return (sp - st).square().mean(dim=1).sqrt().mean()
-
-
-def get_sisnr(ref_sig, out_sig, eps=1e-8):
-    """Calcuate Scale-Invariant Source-to-Noise Ratio (SI-SNR)
-    Args:
-        ref_sig: numpy.ndarray, [B, T]
-        out_sig: numpy.ndarray, [B, T]
-    Returns:
-        SISNR
-    """
-    assert len(ref_sig) == len(out_sig)
-    B, T = ref_sig.shape
-    ref_sig = ref_sig - np.mean(ref_sig, axis=1).reshape(B, 1)
-    out_sig = out_sig - np.mean(out_sig, axis=1).reshape(B, 1)
-    ref_energy = (np.sum(ref_sig ** 2, axis=1) + eps).reshape(B, 1)
-    proj = (np.sum(ref_sig * out_sig, axis=1).reshape(B, 1)) * \
-           ref_sig / ref_energy
-    noise = out_sig - proj
-    ratio = np.sum(proj ** 2, axis=1) / (np.sum(noise ** 2, axis=1) + eps)
-    sisnr = 10 * np.log(ratio + eps) / np.log(10.0)
-    return sisnr.mean()
 
 
 # from: https://github.com/eagomez2/upf-smc-speech-enhancement-thesis/blob/main/src/utils/evaluation_process.py
