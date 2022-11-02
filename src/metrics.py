@@ -22,8 +22,8 @@ VISQOL_MIN_DURATION = 0.48
 def run_metrics(clean, estimate, args, filename):
     hr_sr = args.experiment.hr_sr if 'experiment' in args else args.hr_sr
     speech_mode = args.experiment.speech_mode if 'speech_mode' in args.experiment else True
-    pesq, stoi, snr, lsd, sisnr, visqol = get_metrics(clean, estimate, hr_sr, filename, speech_mode, calc_visqol=args.visqol)
-    return pesq, stoi, snr, lsd, sisnr, visqol, estimate
+    lsd, visqol = get_metrics(clean, estimate, hr_sr, filename, speech_mode, calc_visqol=args.visqol)
+    return lsd, visqol
 
 
 def get_metrics(clean, estimate, sr, filename, speech_mode, calc_visqol=True):
@@ -39,7 +39,7 @@ def get_metrics(clean, estimate, sr, filename, speech_mode, calc_visqol=True):
     lsd = get_lsd(clean, estimate).item()
     sisnr = get_sisnr(clean_numpy, estimate_numpy)
     visqol = get_visqol(clean_numpy, estimate_numpy, filename, sr, speech_mode) if calc_visqol else 0
-    return pesq, stoi, snr, lsd, sisnr, visqol
+    return lsd, visqol
 
 
 def get_pesq(ref_sig, out_sig, sr):

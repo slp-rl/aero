@@ -48,14 +48,13 @@ def evaluate_lr_hr_pr_data(data, wandb_n_files_to_log, files_to_log, epoch, args
     pr_spec = PIL.Image.open(pr_spec_path) if os.path.exists(pr_spec_path) else None
     lr_spec = PIL.Image.open(lr_spec_path) if os.path.exists(lr_spec_path) else None
 
-    pesq_i, stoi_i, snr_i, lsd_i, sisnr_i, visqol_i, estimate_i = run_metrics(hr, pr, args, filename)
+    lsd_i, visqol_i = run_metrics(hr, pr, args, filename)
     if filename in files_to_log:
 
-        log_to_wandb(pr, hr, lr, pesq_i, stoi_i, snr_i, lsd_i, sisnr_i, visqol_i,
+        log_to_wandb(pr, hr, lr, lsd_i, visqol_i,
                      filename, epoch, lr_sr, hr_sr, lr_spec, pr_spec, hr_spec)
 
-    return {'pesq': pesq_i,'stoi': stoi_i, 'snr': snr_i, 'lsd': lsd_i,
-            'sisnr':sisnr_i, 'visqol': visqol_i, 'filename': filename}
+    return {'lsd': lsd_i, 'visqol': visqol_i, 'filename': filename}
 
 from pathlib import Path
 
@@ -85,9 +84,9 @@ def evaluate_lr_hr_data(data, model, wandb_n_files_to_log, files_to_log, epoch, 
         pr = pr.cpu()
         lr = lr.cpu()
 
-    pesq_i, stoi_i, snr_i, lsd_i, sisnr_i, visqol_i, estimate_i = run_metrics(hr, pr, args, filename)
+    lsd_i, visqol_i = run_metrics(hr, pr, args, filename)
     if filename in files_to_log:
-        log_to_wandb(estimate_i, hr, lr, pesq_i, stoi_i, snr_i, lsd_i, sisnr_i, visqol_i,
+        log_to_wandb(estimate_i, hr, lr, lsd_i, visqol_i,
                      filename, epoch, lr_sr, hr_sr, lr_spec.cpu(), pr_spec.cpu(), hr_spec.cpu())
 
     if enhance:
@@ -101,16 +100,11 @@ def evaluate_lr_hr_data(data, model, wandb_n_files_to_log, files_to_log, epoch, 
 
 
 def evaluate_on_saved_data(args, data_loader, epoch):
-    total_pesq = 0
-    total_stoi = 0
+
     total_lsd = 0
-    total_sisnr = 0
     total_visqol = 0
 
-    pesq_count = 0
-    stoi_count = 0
     lsd_count = 0
-    sisnr_count = 0
     visqol_count = 0
 
     total_cnt = 0
@@ -124,48 +118,30 @@ def evaluate_on_saved_data(args, data_loader, epoch):
         for i, data in enumerate(iterator):
             metrics_i = evaluate_lr_hr_pr_data(data, wandb_n_files_to_log, files_to_log, epoch, args)
 
-            total_pesq += metrics_i['pesq']
-            total_stoi += metrics_i['stoi']
             total_lsd += metrics_i['lsd']
-            total_sisnr += metrics_i['sisnr']
             total_visqol += metrics_i['visqol']
 
-            pesq_count += 1 if metrics_i['pesq'] != 0 else 0
-            stoi_count += 1 if metrics_i['stoi'] != 0 else 0
             lsd_count += 1 if metrics_i['lsd'] != 0 else 0
-            sisnr_count += 1 if metrics_i['sisnr'] != 0 else 0
             visqol_count += 1 if metrics_i['visqol'] != 0 else 0
 
             total_cnt += 1
 
-    if pesq_count != 0:
-        avg_pesq, = distrib.average([total_pesq / pesq_count], total_pesq)
-    else:
-        avg_pesq = 0
-    if stoi_count != 0:
-        avg_stoi, = distrib.average([total_stoi / stoi_count], stoi_count)
-    else:
-        avg_stoi = 0
     if lsd_count != 0:
         # avg_lsd, = distrib.average([total_lsd / lsd_count], lsd_count)
         avg_lsd, = [total_lsd / lsd_count]
     else:
         avg_lsd = 0
-    if sisnr_count != 0:
-        avg_sisnr, = distrib.average([total_sisnr / sisnr_count], sisnr_count)
-    else:
-        avg_sisnr = 0
+
     if visqol_count != 0:
-        # avg_visqol, = distrib.average([total_visqol / visqol_count], visqol_count)
         avg_visqol, = [total_visqol / visqol_count]
     else:
         avg_visqol = 0
 
     logger.info(bold(
-        f'{args.experiment.name}, {args.experiment.lr_sr}->{args.experiment.hr_sr}. Test set performance:PESQ={avg_pesq} ({pesq_count}/{total_cnt}), STOI={avg_stoi} ({stoi_count}/{total_cnt}),'
-        f'LSD={avg_lsd} ({lsd_count}/{total_cnt}), SISNR={avg_sisnr} ({sisnr_count}/{total_cnt}),VISQOL={avg_visqol} ({visqol_count}/{total_cnt}).'))
+        f'{args.experiment.name}, {args.experiment.lr_sr}->{args.experiment.hr_sr}. Test set performance:'
+        f'LSD={avg_lsd} ({lsd_count}/{total_cnt}), VISQOL={avg_visqol} ({visqol_count}/{total_cnt}).'))
 
-    return avg_pesq, avg_stoi, avg_lsd, avg_sisnr, avg_visqol
+    return avg_lsd, avg_visqol
 
 
 def evaluate(args, data_loader, epoch, model):
@@ -237,18 +213,14 @@ def evaluate(args, data_loader, epoch, model):
     return avg_pesq, avg_stoi, avg_lsd, avg_sisnr, avg_visqol, total_filenames
 
 
-def log_to_wandb(pr_signal, hr_signal, lr_signal, pesq, stoi, snr, lsd, sisnr, visqol, filename, epoch, lr_sr, hr_sr, lr_spec=None, pr_spec=None, hr_spec=None):
+def log_to_wandb(pr_signal, hr_signal, lr_signal, lsd, visqol, filename, epoch, lr_sr, hr_sr, lr_spec=None, pr_spec=None, hr_spec=None):
     spectrogram_transform = Spectrogram()
     enhanced_spectrogram = spectrogram_transform(pr_signal).log2()[0, :, :].numpy()
     enhanced_spectrogram_wandb_image = wandb.Image(convert_spectrogram_to_heatmap(enhanced_spectrogram),
                                                    caption='PR')
     enhanced_wandb_audio = wandb.Audio(pr_signal.squeeze().numpy(), sample_rate=hr_sr, caption='PR')
 
-    wandb_dict = {f'test samples/{filename}/pesq': pesq,
-                  f'test samples/{filename}/stoi': stoi,
-                  f'test samples/{filename}/snr': snr,
-                  f'test samples/{filename}/lsd': lsd,
-                  f'test samples/{filename}/sisnr': sisnr,
+    wandb_dict = {f'test samples/{filename}/lsd': lsd,
                   f'test samples/{filename}/visqol': visqol,
                   f'test samples/{filename}/spectrogram': enhanced_spectrogram_wandb_image,
                   f'test samples/{filename}/audio': enhanced_wandb_audio}
@@ -335,9 +307,9 @@ if __name__ == "__main__":
 
     data_set = PrHrSet(samples_dir)
     dataloader = DataLoader(data_set, batch_size=1, shuffle=False)
-    avg_pesq, avg_stoi, avg_lsd, avg_sisnr, avg_visqol = evaluate_on_saved_data(args, dataloader, epoch=0)
+    avg_lsd, avg_visqol = evaluate_on_saved_data(args, dataloader, epoch=0)
 
     log_results(args, dataloader, epoch=0)
 
-    print(f'pesq: {avg_pesq}, stoi: {avg_stoi}, lsd: {avg_lsd}, sisnr: {avg_sisnr}, visqol: {avg_visqol}')
+    print(f'lsd: {avg_lsd}, visqol: {avg_visqol}')
     print('done evaluating.')

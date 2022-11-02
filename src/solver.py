@@ -45,10 +45,7 @@ GENERATOR_OPTIMIZER_KEY = 'generator_optimizer'
 METRICS_KEY_EVALUATION_LOSS = 'evaluation_loss'
 METRICS_KEY_BEST_LOSS = 'best_loss'
 
-METRICS_KEY_PESQ = 'Average pesq'
-METRICS_KEY_STOI = 'Average stoi'
 METRICS_KEY_LSD = 'Average lsd'
-METRICS_KEY_SISNR = 'Average sisnr'
 METRICS_KEY_VISQOL = 'Average visqol'
 
 
@@ -305,16 +302,16 @@ class Solver(object):
                         logger.info('Samples already evaluated in cross validation, calculating metrics.')
                         enhanced_dataset = PrHrSet(self.args.samples_dir, enhanced_filenames)
                         enhanced_dataloader = distrib.loader(enhanced_dataset, batch_size=1, shuffle=False, num_workers=self.args.num_workers)
-                        pesq, stoi, lsd, sisnr, visqol = evaluate_on_saved_data(self.args, enhanced_dataloader, epoch)
+                        lsd, visqol = evaluate_on_saved_data(self.args, enhanced_dataloader, epoch)
                     elif self.args.joint_evaluate_and_enhance:
                         logger.info('Jointly evaluating and enhancing.')
-                        pesq, stoi, lsd, sisnr, visqol, enhanced_filenames = evaluate(self.args, self.tt_loader, epoch,
+                        lsd, visqol, enhanced_filenames = evaluate(self.args, self.tt_loader, epoch,
                                                               self.model)
                     else: # TODO: fix bug - no spectograms created in enhance function.
                         enhanced_filenames = enhance(self.tt_loader, self.model, self.args)
                         enhanced_dataset = PrHrSet(self.args.samples_dir, enhanced_filenames)
                         enhanced_dataloader = DataLoader(enhanced_dataset, batch_size=1, shuffle=False)
-                        pesq, stoi, lsd, sisnr, visqol = evaluate_on_saved_data(self.args, enhanced_dataloader, epoch)
+                        lsd, visqol = evaluate_on_saved_data(self.args, enhanced_dataloader, epoch)
 
                     if epoch == self.epochs - 1 and self.args.log_results:
                         # log results at last epoch
@@ -327,8 +324,7 @@ class Solver(object):
 
                     logger.info(bold(f'Evaluation Time {time.time() - evaluation_start:.2f}s'))
 
-                metrics.update({METRICS_KEY_PESQ: pesq, METRICS_KEY_STOI: stoi, METRICS_KEY_LSD: lsd,
-                                METRICS_KEY_SISNR: sisnr, METRICS_KEY_VISQOL: visqol})
+                metrics.update({METRICS_KEY_LSD: lsd, METRICS_KEY_VISQOL: visqol})
 
 
 
