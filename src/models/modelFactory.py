@@ -12,9 +12,9 @@ def get_model(args):
     if 'adversarial' in args.experiment and args.experiment.adversarial:
         multiple_discriminators_mode = 'multiple_discriminators' in args.experiment and args.experiment.multiple_discriminators
         if multiple_discriminators_mode:
-            if 'melgan' in args.experiment.discriminator_models:
+            if 'msd_melgan' in args.experiment.discriminator_models:
                 discriminator = Discriminator(**args.experiment.melgan_discriminator)
-                models.update({'melgan': discriminator})
+                models.update({'msd_melgan': discriminator})
             if 'msd' in args.experiment.discriminator_models:
                 msd = MultiScaleDiscriminator(**args.experiment.msd)
                 models.update({'msd': msd})
@@ -35,9 +35,9 @@ def get_model(args):
                 spec_discriminator = SpecDiscriminator(**args.experiment.spec_discriminator)
                 models.update({'spec': spec_discriminator})
         else:
-            if args.experiment.discriminator_model == 'melgan':
+            if args.experiment.discriminator_model == 'msd_melgan':
                 discriminator = Discriminator(**args.experiment.melgan_discriminator)
-                models.update({'melgan':discriminator})
+                models.update({'msd_melgan':discriminator})
             elif args.experiment.discriminator_model == 'msd':
                 msd = MultiScaleDiscriminator(**args.experiment.msd)
                 models.update({'msd': msd})

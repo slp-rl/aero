@@ -513,13 +513,13 @@ class Solver(object):
                 # for the disc_optimizers: necessary to name the adversarial discriminator losses by their
                 # respective discriminators
                 if self.multiple_discriminators_mode: # this is ugly. Fix when mergning single discriminator case with multiple discriminators case
-                    if 'melgan' in self.args.experiment.discriminator_models:
+                    if 'msd_melgan' in self.args.experiment.discriminator_models:
                         generator_losses, discriminator_loss = self._get_melgan_adversarial_loss(pr_time, hr_time)
                         if not self.args.experiment.only_features_loss:
                             losses['generator'].update({'adversarial_melgan': generator_losses['adversarial']})
                         if not self.args.experiment.only_adversarial_loss:
                             losses['generator'].update({'features_melgan': generator_losses['features']})
-                        losses['discriminator'].update({'melgan': discriminator_loss})
+                        losses['discriminator'].update({'msd_melgan': discriminator_loss})
                     if 'msd' in self.args.experiment.discriminator_models:
                         generator_losses, discriminator_loss = self._get_msd_adversarial_loss(pr_time, hr_time)
                         if not self.args.experiment.only_features_loss:
@@ -562,13 +562,13 @@ class Solver(object):
                         losses['generator'].update({'adversarial_stft': generator_loss})
                         losses['discriminator'].update({'stft': discriminator_loss})
                 else:
-                    if self.args.experiment.discriminator_model == 'melgan':
+                    if self.args.experiment.discriminator_model == 'msd_melgan':
                         generator_losses, discriminator_loss = self._get_melgan_adversarial_loss(pr_time, hr_time)
                         if not self.args.experiment.only_features_loss:
                             losses['generator'].update({'adversarial_melgan': generator_losses['adversarial']})
                         if not self.args.experiment.only_adversarial_loss:
                             losses['generator'].update({'features_melgan': generator_losses['features']})
-                        losses['discriminator'].update({'melgan': discriminator_loss})
+                        losses['discriminator'].update({'msd_melgan': discriminator_loss})
                     if self.args.experiment.discriminator_model == 'msd':
                         generator_losses, discriminator_loss = self._get_msd_adversarial_loss(pr_time, hr_time)
                         if not self.args.experiment.only_features_loss:
@@ -619,7 +619,7 @@ class Solver(object):
 
     def _get_melgan_adversarial_loss(self, pr, hr):
 
-        discriminator = self.dmodels['melgan']
+        discriminator = self.dmodels['msd_melgan']
 
         discriminator_fake_detached = discriminator(pr.detach())
         discriminator_real = discriminator(hr)

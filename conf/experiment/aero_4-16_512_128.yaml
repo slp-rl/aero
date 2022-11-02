@@ -68,7 +68,9 @@ adversarial: True
 features_loss_lambda: 100
 only_features_loss: False
 only_adversarial_loss: False
-discriminator_model: melgan #melgan/hifi/stft
+discriminator_models: [ msd_melgan ] #msd_melgan/msd_hifi/mpd
+multiple_discriminators: true # TODO: remove, make as default
+joint_disc_optimizers: true # TODO: remove, make as default
 melgan_discriminator:
   n_layers: 4
   num_D: 3

@@ -104,20 +104,20 @@ def run(args):
             else:
                 optimizers['discriminator'] = {}
                 for discriminator_name in args.experiment.discriminator_models:
-                    if discriminator_name == 'melgan':
-                        melgan_disc_optimizer = torch.optim.Adam(models['melgan'].parameters(), lr=args.lr,
+                    if discriminator_name == 'msd_melgan':
+                        melgan_disc_optimizer = torch.optim.Adam(models['msd_melgan'].parameters(), lr=args.lr,
                                                                  betas=(0.9, args.beta2))
-                        optimizers['discriminator'].update({'melgan': melgan_disc_optimizer})
+                        optimizers['discriminator'].update({'msd_melgan': melgan_disc_optimizer})
                     if discriminator_name == 'hifi':
                         hifi_disc_optimizer = torch.optim.AdamW(
                             itertools.chain(models['msd'].parameters(), models['mpd'].parameters()),
                             args.lr, betas=(0.9, args.beta2))
                         optimizers['discriminator'].update({'hifi': hifi_disc_optimizer})
-                    if args.experiment.discriminator_model == 'mbd':
+                    if discriminator_name == 'mbd':
                         mbd_optimizer = torch.optim.Adam(models['mbd'].parameters(), lr=args.lr,
                                                          betas=(0.9, args.beta2))
                         optimizers['discriminator'].update({'disc_optimizer': mbd_optimizer})
-                    if args.experiment.discriminator_model == 'msd':
+                    if discriminator_name == 'msd':
                         msd_optimizer = torch.optim.Adam(models['msd'].parameters(), lr=args.lr,
                                                          betas=(0.9, args.beta2))
                         optimizers['discriminator'].update({'disc_optimizer': msd_optimizer})
@@ -129,8 +129,8 @@ def run(args):
                         mbd_optimizer = torch.optim.Adam(models['mbd'].parameters(), lr=args.lr, betas=(0.9, args.beta2))
                         optimizers['discriminator'].update({'disc_optimizer': mbd_optimizer})
         else:
-            if args.experiment.discriminator_model == 'melgan':
-                melgan_disc_optimizer = torch.optim.Adam(models['melgan'].parameters(), lr=args.lr, betas=(0.9, args.beta2))
+            if args.experiment.discriminator_model == 'msd_melgan':
+                melgan_disc_optimizer = torch.optim.Adam(models['msd_melgan'].parameters(), lr=args.lr, betas=(0.9, args.beta2))
                 optimizers.update({'disc_optimizer': melgan_disc_optimizer})
             elif args.experiment.discriminator_model == 'hifi':
                 hifi_disc_optimizer = torch.optim.AdamW(itertools.chain(models['msd'].parameters(), models['mpd'].parameters()),
