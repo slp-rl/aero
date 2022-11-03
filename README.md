@@ -1,6 +1,14 @@
 # AERO
 Audio Super Resolution in the Spectral Domain
 
+## Requirements
+
+### ViSQOL
+
+Build Bazel and ViSQOL following directions from [here](https://github.com/google/visqol#build).
+
+Add the absolute path of the root directory of ViSQOL (where the WORKSPACE file is), to the `visqol path` parameter in 
+`main_config.yaml`.
 ## Preparing Data
 
 ### Resample data

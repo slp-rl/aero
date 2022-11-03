@@ -50,7 +50,6 @@ def evaluate_lr_hr_pr_data(data, wandb_n_files_to_log, files_to_log, epoch, args
 
     lsd_i, visqol_i = run_metrics(hr, pr, args, filename)
     if filename in files_to_log:
-
         log_to_wandb(pr, hr, lr, lsd_i, visqol_i,
                      filename, epoch, lr_sr, hr_sr, lr_spec, pr_spec, hr_spec)
 
@@ -69,8 +68,10 @@ def evaluate_lr_hr_data(data, model, wandb_n_files_to_log, files_to_log, epoch, 
         lr_sr = hr_sr
     else:
         lr_sr = args.experiment.lr_sr if 'experiment' in args else args.lr_sr
+    model.eval()
     with torch.no_grad():
         pr, pr_spec, lr_spec = model(lr, return_spec=True, return_lr_spec=True)
+    model.train()
     pr = match_signal(pr, hr.shape[-1])
     hr_spec = model._spec(hr, scale=True)
     filename = Path(hr_path[0]).stem

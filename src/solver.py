@@ -54,8 +54,6 @@ class Solver(object):
         self.args = args
 
         self.adversarial_mode = 'adversarial' in args.experiment and args.experiment.adversarial
-        self.multiple_discriminators_mode = 'multiple_discriminators' in args.experiment and args.experiment.multiple_discriminators
-        self.joint_disc_optimizers = 'joint_disc_optimizers' in self.args.experiment and self.args.experiment.joint_disc_optimizers
 
         self.models = models
         self.dmodels = {k: distrib.wrap(model) for k, model in models.items()}
@@ -66,10 +64,7 @@ class Solver(object):
         self.optimizers = optimizers
         self.optimizer = optimizers['optimizer']
         if self.adversarial_mode:
-            if self.multiple_discriminators_mode and not self.joint_disc_optimizers:
-                self.disc_optimizers = optimizers['discriminator']
-            else:
-                self.disc_optimizers = {'disc_optimizer': optimizers['disc_optimizer']}
+            self.disc_optimizers = {'disc_optimizer': optimizers['disc_optimizer']}
 
 
         # Training config
@@ -131,14 +126,8 @@ class Solver(object):
 
     def _serialize_optimizers(self):
         serialized_optimizers = {}
-        if self.multiple_discriminators_mode and not self.joint_disc_optimizers:
-            serialized_optimizers['optimizer'] = self.optimizers['optimizer'].state_dict()
-            serialized_optimizers.update({'discriminator': {}})
-            for name, optimizer in self.optimizers['discriminator'].items():
-                serialized_optimizers['discriminator'][name] = optimizer.state_dict()
-        else:
-            for name, optimizer in self.optimizers.items():
-                serialized_optimizers[name] = optimizer.state_dict()
+        for name, optimizer in self.optimizers.items():
+            serialized_optimizers[name] = optimizer.state_dict()
         return serialized_optimizers
 
     def _serialize(self):
@@ -172,13 +161,8 @@ class Solver(object):
         else:
             for name, model_package in package[SERIALIZE_KEY_MODELS].items():
                 self.models[name].load_state_dict(model_package[SERIALIZE_KEY_STATE])
-            if self.multiple_discriminators_mode and not self.joint_disc_optimizers:
-                self.optimizers['optimizer'].load_state_dict(package[SERIALIZE_KEY_OPTIMIZERS]['optimizer'])
-                for name, opt_package in package[SERIALIZE_KEY_OPTIMIZERS]['discriminator'].items():
-                    self.optimizers['discriminator'][name].load_state_dict(opt_package)
-            else:
-                for name, opt_package in package[SERIALIZE_KEY_OPTIMIZERS].items():
-                    self.optimizers[name].load_state_dict(opt_package)
+            for name, opt_package in package[SERIALIZE_KEY_OPTIMIZERS].items():
+                self.optimizers[name].load_state_dict(opt_package)
 
     def _reset(self):
         """_reset."""
@@ -253,6 +237,7 @@ class Solver(object):
                         evaluated_on_test_data = True
                     else:
                         valid_losses = self._run_one_epoch(epoch, cross_valid=True)
+                self.model.train()
                 evaluation_loss = valid_losses['evaluation']
                 logger_msg = f'Validation Summary | End of Epoch {epoch + 1} | Time {time.time() - cross_valid_start:.2f}s | ' \
                              + ' | '.join([f'{k} Valid Loss {v:.5f}' for k, v in valid_losses.items()])
@@ -304,7 +289,7 @@ class Solver(object):
                         logger.info('Jointly evaluating and enhancing.')
                         lsd, visqol, enhanced_filenames = evaluate(self.args, self.tt_loader, epoch,
                                                               self.model)
-                    else: # TODO: fix bug - no spectograms created in enhance function.
+                    else: # opposed to above cases, no spectrograms saved in samples directory.
                         enhanced_filenames = enhance(self.tt_loader, self.model, self.args)
                         enhanced_dataset = PrHrSet(self.args.samples_dir, enhanced_filenames)
                         enhanced_dataloader = DataLoader(enhanced_dataset, batch_size=1, shuffle=False)
@@ -358,6 +343,8 @@ class Solver(object):
 
             if return_spec:
                 pr_time, pr_spec = self.dmodel(lr, return_spec=return_spec)
+                if cross_valid:
+                    pr_time = match_signal(pr_time, hr.shape[-1])
 
                 hr_spec = self.dmodel._spec(hr, scale=True)
 
@@ -365,9 +352,8 @@ class Solver(object):
                 pr_reprs = {'time': pr_time, 'spec': pr_spec}
             else:
                 pr_time = self.dmodel(lr)
-
-                # logger.info(f'hr shape: {hr.shape}.')
-                # logger.info(f'pr shape: {pr_time.shape}.')
+                if cross_valid:
+                    pr_time = match_signal(pr_time, hr.shape[-1])
 
                 hr_reprs = {'time': hr}
                 pr_reprs = {'time': pr_time}
@@ -491,125 +477,35 @@ class Solver(object):
             if 'stft' in self.args.losses:
                 stft_loss = self._get_stft_loss(pr_time, hr_time)
                 losses['generator'].update({'stft': stft_loss})
-            if 'perceptual' in self.args.losses:
-                percept_loss = self.perceptual_loss(pr_time.squeeze(dim=1), hr_time.squeeze(dim=1)).mean()
-                losses['generator'].update({'perceptual': percept_loss})
-            if 'mel' in self.args.losses:
-                # L1 Mel-Spectrogram Loss
-                hr_mel = self.melspec_transform(hr_time)
-                pr_mel = self.melspec_transform(pr_time)
-                losses['generator'].update({'mel': F.l1_loss(hr_mel, pr_mel)
-                                                   * self.args.experiment.mel_spec_loss_lambda})
-
-            if 'spectral_l1' in self.args.losses:
-                losses['generator'].update({'spectral_l1': F.l1_loss(pr['spec'], hr['spec'])})
-
-            if 'spectral_l2' in self.args.losses:
-                hr_spec = torch.view_as_real(hr['spec'])
-                pr_spec = torch.view_as_real(pr['spec'])
-                losses['generator'].update({'spectral_l2': F.mse_loss(pr_spec, hr_spec)})
 
             if self.adversarial_mode:
                 # for the disc_optimizers: necessary to name the adversarial discriminator losses by their
                 # respective discriminators
-                if self.multiple_discriminators_mode: # this is ugly. Fix when mergning single discriminator case with multiple discriminators case
-                    if 'msd_melgan' in self.args.experiment.discriminator_models:
-                        generator_losses, discriminator_loss = self._get_melgan_adversarial_loss(pr_time, hr_time)
-                        if not self.args.experiment.only_features_loss:
-                            losses['generator'].update({'adversarial_melgan': generator_losses['adversarial']})
-                        if not self.args.experiment.only_adversarial_loss:
-                            losses['generator'].update({'features_melgan': generator_losses['features']})
-                        losses['discriminator'].update({'msd_melgan': discriminator_loss})
-                    if 'msd' in self.args.experiment.discriminator_models:
-                        generator_losses, discriminator_loss = self._get_msd_adversarial_loss(pr_time, hr_time)
-                        if not self.args.experiment.only_features_loss:
-                            losses['generator'].update({'adversarial_msd': generator_losses['adversarial']})
-                        if not self.args.experiment.only_adversarial_loss:
-                            losses['generator'].update({'features_msd': generator_losses['features']})
-                        losses['discriminator'].update({'msd': discriminator_loss})
-                    if 'mpd' in self.args.experiment.discriminator_models:
-                        generator_losses, discriminator_loss = self._get_mpd_adversarial_loss(pr_time, hr_time)
-                        if not self.args.experiment.only_features_loss:
-                            losses['generator'].update({'adversarial_mpd': generator_losses['adversarial']})
-                        if not self.args.experiment.only_adversarial_loss:
-                            losses['generator'].update({'features_mpd': generator_losses['features']})
-                        losses['discriminator'].update({'mpd': discriminator_loss})
-                    if 'hifi' in self.args.experiment.discriminator_models:
-                        generator_loss, discriminator_loss = self._get_hifi_adversarial_loss(pr_time, hr_time)
-                        losses['generator'].update({'adversarial_hifi': generator_loss})
-                        losses['discriminator'].update({'hifi': discriminator_loss})
-                    if 'mbd' in self.args.experiment.discriminator_models:
-                        generator_loss, discriminator_loss = self._get_mbd_adversarial_loss(pr_time, hr_time)
-                        losses['generator'].update({'adversarial_mbd': generator_loss})
-                        losses['discriminator'].update({'mbd': discriminator_loss})
-                    if 'spec' in self.args.experiment.discriminator_models:
-                        if self.args.experiment.mel_spec_transform:
-                            hr_spec = self.melspec_transform(hr_time).squeeze(dim=1)
-                            pr_spec = self.melspec_transform(pr_time).squeeze(dim=1)
-                        else:
-                            hr_spec = hr['spec'].squeeze(dim=1)
-                            pr_spec = pr['spec'].squeeze(dim=1)
-                        generator_losses, discriminator_loss = self._get_spec_adversarial_loss(pr_spec, hr_spec)
-                        if not self.args.experiment.only_features_loss:
-                            losses['generator'].update({'adversarial_spec': generator_losses['adversarial']})
-                        if not self.args.experiment.only_adversarial_loss:
-                            losses['generator'].update({'features_spec': generator_losses['features']})
-                        losses['discriminator'].update({'spec': discriminator_loss})
-                    if 'stft' in self.args.experiment.discriminator_models:
-                        hr_spec = torch.view_as_real(hr['spec'].squeeze(dim=1)).permute(0, 3, 1, 2)
-                        pr_spec = torch.view_as_real(pr['spec'].squeeze(dim=1)).permute(0, 3, 1, 2)
-                        generator_loss, discriminator_loss = self._get_stft_adversarial_loss(pr_spec, hr_spec)
-                        losses['generator'].update({'adversarial_stft': generator_loss})
-                        losses['discriminator'].update({'stft': discriminator_loss})
-                else:
-                    if self.args.experiment.discriminator_model == 'msd_melgan':
-                        generator_losses, discriminator_loss = self._get_melgan_adversarial_loss(pr_time, hr_time)
-                        if not self.args.experiment.only_features_loss:
-                            losses['generator'].update({'adversarial_melgan': generator_losses['adversarial']})
-                        if not self.args.experiment.only_adversarial_loss:
-                            losses['generator'].update({'features_melgan': generator_losses['features']})
-                        losses['discriminator'].update({'msd_melgan': discriminator_loss})
-                    if self.args.experiment.discriminator_model == 'msd':
-                        generator_losses, discriminator_loss = self._get_msd_adversarial_loss(pr_time, hr_time)
-                        if not self.args.experiment.only_features_loss:
-                            losses['generator'].update({'adversarial_msd': generator_losses['adversarial']})
-                        if not self.args.experiment.only_adversarial_loss:
-                            losses['generator'].update({'features_msd': generator_losses['features']})
-                        losses['discriminator'].update({'msd': discriminator_loss})
-                    if self.args.experiment.discriminator_model == 'mpd':
-                        generator_losses, discriminator_loss = self._get_mpd_adversarial_loss(pr_time, hr_time)
-                        if not self.args.experiment.only_features_loss:
-                            losses['generator'].update({'adversarial_mpd': generator_losses['adversarial']})
-                        if not self.args.experiment.only_adversarial_loss:
-                            losses['generator'].update({'features_mpd': generator_losses['features']})
-                        losses['discriminator'].update({'mpd': discriminator_loss})
-                    if self.args.experiment.discriminator_model == 'hifi':
-                        generator_loss, discriminator_loss = self._get_hifi_adversarial_loss(pr_time, hr_time)
-                        losses['generator'].update({'adversarial_hifi': generator_loss})
-                        losses['discriminator'].update({'hifi': discriminator_loss})
-                    if self.args.experiment.discriminator_model == 'mbd':
-                        generator_loss, discriminator_loss = self._get_mbd_adversarial_loss(pr_time, hr_time)
-                        losses['generator'].update({'adversarial_mbd': generator_loss})
-                        losses['discriminator'].update({'mbd': discriminator_loss})
-                    if self.args.experiment.discriminator_model == 'spec':
-                        if self.args.experiment.mel_spec_transform:
-                            hr_spec = self.melspec_transform(hr_time).squeeze(dim=1)
-                            pr_spec = self.melspec_transform(pr_time).squeeze(dim=1)
-                        else:
-                            hr_spec = hr['spec'].squeeze(dim=1)
-                            pr_spec = pr['spec'].squeeze(dim=1)
-                        generator_losses, discriminator_loss = self._get_spec_adversarial_loss(pr_spec, hr_spec)
-                        if not self.args.experiment.only_features_loss:
-                            losses['generator'].update({'adversarial_spec': generator_losses['adversarial']})
-                        if not self.args.experiment.only_adversarial_loss:
-                            losses['generator'].update({'features_spec': generator_losses['features']})
-                        losses['discriminator'].update({'spec': discriminator_loss})
-                    if self.args.experiment.discriminator_model == 'stft':
-                        hr_spec = torch.view_as_real(hr['spec'].squeeze(dim=1)).permute(0, 3, 1, 2)
-                        pr_spec = torch.view_as_real(pr['spec'].squeeze(dim=1)).permute(0, 3, 1, 2)
-                        generator_loss, discriminator_loss = self._get_stft_adversarial_loss(pr_spec, hr_spec)
-                        losses['generator'].update({'adversarial_stft': generator_loss})
-                        losses['discriminator'].update({'stft': discriminator_loss})
+                if 'msd_melgan' in self.args.experiment.discriminator_models:
+                    generator_losses, discriminator_loss = self._get_melgan_adversarial_loss(pr_time, hr_time)
+                    if not self.args.experiment.only_features_loss:
+                        losses['generator'].update({'adversarial_melgan': generator_losses['adversarial']})
+                    if not self.args.experiment.only_adversarial_loss:
+                        losses['generator'].update({'features_melgan': generator_losses['features']})
+                    losses['discriminator'].update({'msd_melgan': discriminator_loss})
+                if 'msd_hifi' in self.args.experiment.discriminator_models:
+                    generator_losses, discriminator_loss = self._get_msd_adversarial_loss(pr_time, hr_time)
+                    if not self.args.experiment.only_features_loss:
+                        losses['generator'].update({'adversarial_msd': generator_losses['adversarial']})
+                    if not self.args.experiment.only_adversarial_loss:
+                        losses['generator'].update({'features_msd': generator_losses['features']})
+                    losses['discriminator'].update({'msd': discriminator_loss})
+                if 'mpd' in self.args.experiment.discriminator_models:
+                    generator_losses, discriminator_loss = self._get_mpd_adversarial_loss(pr_time, hr_time)
+                    if not self.args.experiment.only_features_loss:
+                        losses['generator'].update({'adversarial_mpd': generator_losses['adversarial']})
+                    if not self.args.experiment.only_adversarial_loss:
+                        losses['generator'].update({'features_mpd': generator_losses['features']})
+                    losses['discriminator'].update({'mpd': discriminator_loss})
+                if 'hifi' in self.args.experiment.discriminator_models:
+                    generator_loss, discriminator_loss = self._get_hifi_adversarial_loss(pr_time, hr_time)
+                    losses['generator'].update({'adversarial_hifi': generator_loss})
+                    losses['discriminator'].update({'hifi': discriminator_loss})
         return losses
 
     def _get_stft_loss(self, pr, hr):
@@ -654,7 +550,6 @@ class Solver(object):
         adversarial_loss = 0
         for scale in discriminator_fake:
             adversarial_loss += F.relu(1 - scale[-1]).mean()
-            # adversarial_loss += -scale[-1].mean()
 
         if 'only_adversarial_loss' in self.args.experiment and self.args.experiment.only_adversarial_loss:
             return {'adversarial': adversarial_loss}
@@ -735,8 +630,6 @@ class Solver(object):
         g_feat_loss = feature_loss(fmap_f_r, fmap_f_g)
         g_adv_loss = generator_loss(y_df_hat_g)
 
-
-
         if 'only_adversarial_loss' in self.args.experiment and self.args.experiment.only_adversarial_loss:
             return {'adversarial': g_adv_loss}, d_loss
 
@@ -745,82 +638,6 @@ class Solver(object):
 
         return {'adversarial': g_adv_loss,
                 'features': self.args.experiment.features_loss_lambda * g_feat_loss}, d_loss
-
-
-    def _get_spec_adversarial_loss(self, pr_spec, hr_spec):
-
-        spec_disc = self.dmodels['spec']
-
-        # discriminator loss
-        y_ds_hat_r, y_ds_hat_g, _, _ = spec_disc(hr_spec, pr_spec.detach())
-        d_loss = discriminator_loss(y_ds_hat_r, y_ds_hat_g)
-
-        # generator loss
-        y_ds_hat_r, y_ds_hat_g, fmap_s_r, fmap_s_g = spec_disc(hr_spec, pr_spec)
-        g_feat_loss = feature_loss(fmap_s_r, fmap_s_g)
-        g_adv_loss = generator_loss(y_ds_hat_g)
-
-        if 'only_adversarial_loss' in self.args.experiment and self.args.experiment.only_adversarial_loss:
-            return {'adversarial': g_adv_loss}, d_loss
-
-        if 'only_features_loss' in self.args.experiment and self.args.experiment.only_features_loss:
-            return {'features': self.args.experiment.features_loss_lambda * g_feat_loss}, d_loss
-
-        return {'adversarial': g_adv_loss,
-                'features': self.args.experiment.features_loss_lambda * g_feat_loss}, d_loss
-
-    def _get_mbd_adversarial_loss(self, pr, hr):
-        mbd = self.dmodels['mbd']
-
-        # MBD
-        y_ds_hat_r, y_ds_hat_g, _, _ = mbd(hr, pr.detach())
-        loss_discriminator = discriminator_loss(y_ds_hat_r, y_ds_hat_g)
-
-
-        # L1 Mel-Spectrogram Loss
-        pr_mel = self.melspec_transform(pr)
-        hr_mel = self.melspec_transform(hr)
-        loss_mel = F.l1_loss(hr_mel, pr_mel) * self.args.experiment.mel_spec_loss_lambda
-
-        y_ds_hat_r, y_ds_hat_g, fmap_s_r, fmap_s_g = mbd(hr, pr)
-        loss_fm_s = feature_loss(fmap_s_r, fmap_s_g)
-        loss_gen_s = generator_loss(y_ds_hat_g)
-        total_loss_generator = loss_gen_s + loss_fm_s + loss_mel
-
-        return total_loss_generator, loss_discriminator
-
-    def _get_stft_adversarial_loss(self, pr_spec, hr_spec):
-
-        discriminator = self.dmodels['stft_disc']
-
-        discriminator_fake_detached = discriminator(pr_spec.detach().contiguous())
-        discriminator_real = discriminator(hr_spec)
-        discriminator_fake = discriminator(pr_spec)
-
-        discriminator_loss = self._get_stft_discriminator_loss(discriminator_fake_detached, discriminator_real)
-        generator_loss = self._get_stft_generator_loss(discriminator_fake, discriminator_real)
-
-        return generator_loss, discriminator_loss
-
-    def _get_stft_discriminator_loss(self, discriminator_fake, discriminator_real):
-        discriminator_loss = F.relu(1 + discriminator_fake[-1]).mean() + F.relu(1 - discriminator_real[-1]).mean()
-        return discriminator_loss
-
-    def _get_stft_generator_loss(self, discriminator_fake, discriminator_real):
-        generator_loss = 0
-        generator_loss += F.relu(1 - discriminator_fake[-1]).mean()
-
-        generator_loss += self.args.experiment.features_loss_lambda * \
-                          self.stft_feature_loss(discriminator_real, discriminator_fake)
-
-        return generator_loss
-
-    def stft_feature_loss(self, discriminator_real, discriminator_fake):
-        feature_loss = 0
-        n_internal_layers = len(discriminator_fake) - 1
-        for i in range(n_internal_layers):
-            feature_loss += F.l1_loss(discriminator_fake[i], discriminator_real[i].detach())
-        return feature_loss / n_internal_layers
 
 
     def _optimize(self, loss):
@@ -830,20 +647,8 @@ class Solver(object):
         # self.scheduler.step()
 
     def _optimize_adversarial(self, discriminator_losses):
-        if self.multiple_discriminators_mode:
-            if self.joint_disc_optimizers:
-                total_disc_loss = sum(list(discriminator_losses.values()))
-                disc_optimizer = self.disc_optimizers['disc_optimizer']
-                disc_optimizer.zero_grad()
-                total_disc_loss.backward()
-                disc_optimizer.step()
-            else:
-                for discriminator_name, discriminator_loss in discriminator_losses.items():
-                    self.disc_optimizers[f'{discriminator_name}'].zero_grad()
-                    discriminator_loss.backward()
-                    self.disc_optimizers[f'{discriminator_name}'].step()
-        else:
-            disc_optimizer = self.disc_optimizers['disc_optimizer']
-            disc_optimizer.zero_grad()
-            list(discriminator_losses.values())[0].backward()
-            disc_optimizer.step()
+        total_disc_loss = sum(list(discriminator_losses.values()))
+        disc_optimizer = self.disc_optimizers['disc_optimizer']
+        disc_optimizer.zero_grad()
+        total_disc_loss.backward()
+        disc_optimizer.step()

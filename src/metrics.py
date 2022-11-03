@@ -15,25 +15,26 @@ from src.models.stft_loss import stft
 
 logger = logging.getLogger(__name__)
 
-VISQOL_PATH = "/cs/labs/adiyoss/moshemandel/visqol-master; " #TODO: change to args.visqol_path from config file
 SLEEP_DURATION = 0.1
 VISQOL_MIN_DURATION = 0.48
 
 def run_metrics(clean, estimate, args, filename):
     hr_sr = args.experiment.hr_sr if 'experiment' in args else args.hr_sr
     speech_mode = args.experiment.speech_mode if 'speech_mode' in args.experiment else True
-    lsd, visqol = get_metrics(clean, estimate, hr_sr, filename, speech_mode, calc_visqol=args.visqol)
+    lsd, visqol = get_metrics(clean, estimate, hr_sr, filename, speech_mode,args)
     return lsd, visqol
 
 
-def get_metrics(clean, estimate, sr, filename, speech_mode, calc_visqol=True):
+def get_metrics(clean, estimate, sr, filename, speech_mode, args):
+    calc_visqol = args.visqol
+    visqol_path = args.visqol_path
     clean = clean.squeeze(dim=1)
     estimate = estimate.squeeze(dim=1)
     estimate_numpy = estimate.numpy()
     clean_numpy = clean.numpy()
 
     lsd = get_lsd(clean, estimate).item()
-    visqol = get_visqol(clean_numpy, estimate_numpy, filename, sr, speech_mode) if calc_visqol else 0
+    visqol = get_visqol(clean_numpy, estimate_numpy, filename, sr, speech_mode, visqol_path) if calc_visqol else 0
     return lsd, visqol
 
 
@@ -74,8 +75,7 @@ def get_lsd(ref_sig, out_sig):
 
 
 # based on: https://github.com/eagomez2/upf-smc-speech-enhancement-thesis/blob/main/src/utils/evaluation_process.py
-#TODO: avoid creating files when evaluating on previously enhanced files that already exist.
-def get_visqol(ref_sig, out_sig, filename, sr, speech_mode):
+def get_visqol(ref_sig, out_sig, filename, sr, speech_mode, visqol_path):
     tmp_reference = f"{filename}_ref.wav"
     tmp_estimation = f"{filename}_est.wav"
 
@@ -109,7 +109,7 @@ def get_visqol(ref_sig, out_sig, filename, sr, speech_mode):
         if ref_duration < VISQOL_MIN_DURATION or est_duration < VISQOL_MIN_DURATION:
             raise ValueError('File duration is too small.')
 
-        visqol_cmd = ("cd " + VISQOL_PATH +
+        visqol_cmd = ("cd " + visqol_path + "; " +
                       "./bazel-bin/visqol "
                       f"--reference_file {reference_abs_path} "
                       f"--degraded_file {estimation_abs_path} ")

@@ -74,5 +74,5 @@ def enhance(dataloader, model, args):
 
         if i == args.enhance_samples_limit:
             break
-
+    model.train()
     return total_filenames

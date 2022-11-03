@@ -12,8 +12,7 @@ verbose: 0
 show: 0   # just show the model and its size and exit
 
 # log results
-log_results: true
-n_bins: 10
+log_results: false
 
 # Checkpointing, by default automatically load last checkpoint
 checkpoint: true
@@ -35,14 +34,14 @@ dummy: '' # use this if you want twice the same exp, with a different name
 
 # Evaluation stuff
 visqol: True # compute visqol?
-visqol_path: # fill from install_visqol.sh script
+visqol_path: "/cs/labs/adiyoss/moshemandel/visqol-master" # fill from install_visqol.sh script
 eval_every: 10  # compute test metrics every so epochs
 enhance_samples_limit: -1
 valid_equals_test: # whether valid_dset == test_dset, set in train.py script
 cross_valid: True
-cross_valid_every: 1
+cross_valid_every: 5
 joint_evaluate_and_enhance: False
-evaluate_on_best: True
+evaluate_on_best: False
 
 #wand_b
 wandb:
