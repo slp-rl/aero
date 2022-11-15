@@ -35,12 +35,12 @@ dummy: '' # use this if you want twice the same exp, with a different name
 # Evaluation stuff
 visqol: True # compute visqol?
 visqol_path: "/cs/labs/adiyoss/moshemandel/visqol-master" # fill from install_visqol.sh script
-eval_every: 10  # compute test metrics every so epochs
+eval_every: 25  # compute test metrics every so epochs
 enhance_samples_limit: -1
 valid_equals_test: # whether valid_dset == test_dset, set in train.py script
-cross_valid: True
+cross_valid: False
 cross_valid_every: 5
-joint_evaluate_and_enhance: False
+joint_evaluate_and_enhance: True
 evaluate_on_best: False
 
 #wand_b
@@ -61,7 +61,7 @@ beta2: 0.999
 losses: [ stft ]
 stft_sc_factor: .5
 stft_mag_factor: .5
-epochs: 100
+epochs: 125
 
 # Experiment launching, distributed
 ddp: false

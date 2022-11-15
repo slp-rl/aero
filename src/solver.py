@@ -563,7 +563,7 @@ class Solver(object):
 
     def _get_hifi_adversarial_loss(self, pr, hr):
         mpd = self.dmodels['mpd']
-        msd = self.dmodels['msd']
+        msd = self.dmodels['msd_hifi']
 
         # MPD
         y_df_hat_r, y_df_hat_g, _, _ = mpd(hr, pr.detach())
@@ -596,7 +596,7 @@ class Solver(object):
 
 
     def _get_msd_adversarial_loss(self, pr, hr):
-        msd = self.dmodels['msd']
+        msd = self.dmodels['msd_hifi']
 
         # discriminator loss
         y_ds_hat_r, y_ds_hat_g, _, _ = msd(hr, pr.detach())
@@ -644,7 +644,6 @@ class Solver(object):
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
-        # self.scheduler.step()
 
     def _optimize_adversarial(self, discriminator_losses):
         total_disc_loss = sum(list(discriminator_losses.values()))

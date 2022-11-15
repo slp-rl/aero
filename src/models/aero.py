@@ -517,6 +517,7 @@ class Aero(nn.Module):
             saved.append(x)
 
         x = torch.zeros_like(x)
+        # initialize everything to zero (signal will go through u-net skips).
 
         for idx, decode in enumerate(self.decoder):
             skip = saved.pop(-1)
