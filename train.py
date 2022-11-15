@@ -9,9 +9,6 @@ import shutil
 import hydra
 import wandb
 
-from torch.utils.data import DataLoader
-
-from omegaconf import OmegaConf,open_dict
 from src.ddp.executor import start_ddp_workers
 from src.models import modelFactory
 from src.utils import print_network
@@ -144,9 +141,6 @@ def _main(args):
     for key, value in args.dset.items():
         if isinstance(value, str):
             args.dset[key] = hydra.utils.to_absolute_path(value)
-    if 'upsample' not in args.experiment:
-        with open_dict(args):
-             args.experiment.upsample = True
     __file__ = hydra.utils.to_absolute_path(__file__)
     if args.verbose:
         logger.setLevel(logging.DEBUG)
