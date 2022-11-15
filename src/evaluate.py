@@ -164,7 +164,7 @@ def evaluate(args, data_loader, epoch, model):
             total_lsd += metrics_i['lsd']
             total_visqol += metrics_i['visqol']
 
-            total_filenames += metrics_i['filename']
+            total_filenames.append(metrics_i['filename'])
 
             lsd_count += 1 if metrics_i['lsd'] != 0 else 0
             visqol_count += 1 if metrics_i['visqol'] != 0 else 0

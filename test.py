@@ -9,8 +9,6 @@ from pathlib import Path
 import hydra
 import wandb
 
-from torch.utils.data import DataLoader
-
 from src.data.datasets import LrHrSet
 from src.ddp import distrib
 from src.evaluate import evaluate
@@ -27,7 +25,7 @@ SERIALIZE_KEY_BEST_STATES = 'best_states'
 SERIALIZE_KEY_STATE = 'state'
 
 
-def _load_model(args, load_best=False):
+def _load_model(args):
     model_name = args.experiment.model
     checkpoint_file = Path(args.checkpoint_file)
     model = modelFactory.get_model(args)['generator']
@@ -53,7 +51,6 @@ def run(args):
 
     lsd, visqol, enhanced_filenames = evaluate(args, tt_loader, 0, model)
     logger.info(f'Done evaluation.')
-    logger.info(f'Evaluated files: \n' + '\n'.join([filename for filename in enhanced_filenames]))
 
 
 
