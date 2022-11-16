@@ -253,8 +253,8 @@ class Aero(nn.Module):
                  channels_time=None,
                  growth=2,
                  # STFT
-                 nfft=4096,
-                 hop_length=1024,
+                 nfft=512,
+                 hop_length=64,
                  wiener_iters=0,
                  end_iters=0,
                  wiener_residual=False,
@@ -272,29 +272,29 @@ class Aero(nn.Module):
                  # Convolutions
                  kernel_size=8,
                  time_stride=2,
-                 strides=[4, 4, 4, 4, 4, 4],
+                 strides=[4, 4, 2, 2],
                  context=1,
                  context_enc=0,
                  freq_ends=4,
                  enc_freq_attn=4,
                  # Normalization
-                 norm_starts=4,
+                 norm_starts=2,
                  norm_groups=4,
                  # DConv residual branch
                  dconv_mode=1,
                  dconv_depth=2,
                  dconv_comp=4,
-                 dconv_time_attn=4,
-                 dconv_lstm=4,
-                 dconv_init=1e-4,
+                 dconv_time_attn=2,
+                 dconv_lstm=2,
+                 dconv_init=1e-3,
                  # Weight init
                  rescale=0.1,
                  # Metadata
                  samplerate=44100,
                  segment=4 * 10,
-                 lr_sr=16000,
+                 lr_sr=4000,
                  hr_sr=16000,
-                 spec_upsample=False,
+                 spec_upsample=True,
                  act_func='snake',
                  debug=False):
         """

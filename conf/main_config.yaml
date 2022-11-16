@@ -1,5 +1,5 @@
 defaults:
-  - experiment: example_file
+  - experiment: debug
   - dset: debug
   - hydra/job_logging: colorlog
   - hydra/hydra_logging: colorlog

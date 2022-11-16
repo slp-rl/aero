@@ -24,7 +24,6 @@ SERIALIZE_KEY_MODELS = 'models'
 SERIALIZE_KEY_BEST_STATES = 'best_states'
 SERIALIZE_KEY_STATE = 'state'
 
-
 def _load_model(args):
     model_name = args.experiment.model
     checkpoint_file = Path(args.checkpoint_file)

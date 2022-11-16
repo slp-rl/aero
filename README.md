@@ -52,7 +52,7 @@ python train.py dset=4-16 experiment=aero_4-16_512_64 \
        `python data_prep/create_meta_files.py <path for 16 kHz data> egs/vctk/4-16 hr`
 - Create a directory with experiment name in the format: `aero-nfft=<NFFT>-hl=<HOP_LENGTH>` (e.g. `aero-nfft=512-hl=64`)
 - Copy/download appropriate `checkpoint.th` file to directory (make sure that the corresponding nfft,hop_length parameters correspond to experiment file)
-- Run `python test.py dset=<LR>-<HR> experiment=aero_<LR>-<HR> _<NFFT>_<HOP_LENGTH>`
+- Run `python test.py dset=<LR>-<HR> experiment=aero_<LR>-<HR>_<NFFT>_<HOP_LENGTH>`
 
 e.g. for upsampling from 4kHz to 16kHz:
 
@@ -61,3 +61,9 @@ python test.py dset=4-16 experiment=aero_4-16_512_64
 `
 
 ## Predict (on single sample)
+
+Copy/download appropriate `checkpoint.th` file to directory (make sure that the corresponding nfft,hop_length parameters
+correspond to experiment file)
+
+`python predict.py dset=4-16 experiment=aero_4-16_512_64 +filename=<absolute path to input file> +output=<absolute path to output directory>
+`
