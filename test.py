@@ -51,6 +51,7 @@ def run(args):
 
     lsd, visqol, enhanced_filenames = evaluate(args, tt_loader, 0, model)
     logger.info(f'Done evaluation.')
+    logger.info(f'LSD={lsd} , VISQOL={visqol}')
 
 
 

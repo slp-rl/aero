@@ -91,7 +91,7 @@ def run(args):
 
 
     if 'adversarial' in args.experiment and args.experiment.adversarial:
-        disc_optimizer = torch.optim.AdamW(
+        disc_optimizer = torch.optim.Adam(
             itertools.chain(*[models[disc_name].parameters() for disc_name in
                               args.experiment.discriminator_models]),
             args.lr, betas=(0.9, args.beta2))

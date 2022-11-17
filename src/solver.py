@@ -88,24 +88,14 @@ class Solver(object):
         self.history = []  # Keep track of loss
         self.samples_dir = args.samples_dir  # Where to save samples
 
-
         self.num_prints = args.num_prints  # Number of times to log per epoch
 
         if 'stft' in self.args.losses:
             self.mrstftloss = MultiResolutionSTFTLoss(factor_sc=args.stft_sc_factor,
                                                   factor_mag=args.stft_mag_factor).to(self.device)
-        if 'mbd' in self.args.losses:
-            self.melspec_transform = torchaudio.transforms.MelSpectrogram(
-                self.args.experiment.hr_sr,
-                **self.args.experiment.mel_spectrogram).to(self.device)
-
-        if 'mel_spec_transform' in self.args.experiment and self.args.experiment.mel_spec_transform:
-            self.melspec_transform = torchaudio.transforms.MelSpectrogram(
-                self.args.experiment.hr_sr,
-                **self.args.experiment.mel_spectrogram).to(self.device)
 
         if 'discriminator_model' in self.args.experiment and \
-                (self.args.experiment.discriminator_model == 'hifi' or self.args.experiment.discriminator_model == 'mbd'):
+                self.args.experiment.discriminator_model == 'hifi':
             self.melspec_transform = torchaudio.transforms.MelSpectrogram(
                                             self.args.experiment.hr_sr,
                                             **self.args.experiment.mel_spectrogram).to(self.device)
@@ -163,6 +153,7 @@ class Solver(object):
                 self.models[name].load_state_dict(model_package[SERIALIZE_KEY_STATE])
             for name, opt_package in package[SERIALIZE_KEY_OPTIMIZERS].items():
                 self.optimizers[name].load_state_dict(opt_package)
+
 
     def _reset(self):
         """_reset."""
@@ -336,6 +327,7 @@ class Solver(object):
         name = label + f" | Epoch {epoch + 1}"
         logprog = LogProgress(logger, data_loader, updates=self.num_prints, name=name)
 
+        # return_spec can be used to debug model and see explicit spectral output of model
         return_spec = 'return_spec' in self.args.experiment and self.args.experiment.return_spec
 
         for i, data in enumerate(logprog):

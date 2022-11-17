@@ -41,7 +41,7 @@ If you want to create dummy egs files for debugging code on small number of samp
 ## Train
 
 ```
-python train.py dset=4-16 experiment=aero_4-16_512_64 \
+python train.py dset=4-16 experiment=aero_4-16_512_64
 ```
 
 ## Test (on whole dataset)
@@ -56,14 +56,21 @@ python train.py dset=4-16 experiment=aero_4-16_512_64 \
 
 e.g. for upsampling from 4kHz to 16kHz:
 
-`
-python test.py dset=4-16 experiment=aero_4-16_512_64
-`
+```
+python test.py \
+  dset=4-16 \
+  experiment=aero_4-16_512_64
+```
 
 ## Predict (on single sample)
 
 Copy/download appropriate `checkpoint.th` file to directory (make sure that the corresponding nfft,hop_length parameters
 correspond to experiment file)
 
-`python predict.py dset=4-16 experiment=aero_4-16_512_64 +filename=<absolute path to input file> +output=<absolute path to output directory>
-`
+```
+python predict.py \
+  dset=4-16 \
+  experiment=aero_4-16_512_64 \
+  +filename=<absolute path to input file> \
+  +output=<absolute path to output directory>
+```
