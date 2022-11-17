@@ -61,21 +61,6 @@ If you want to create dummy egs files for debugging code on small number of samp
 `python data_prep/create_meta_files.py <path for 4 kHz data> egs/vctk/4-16 lr --n_samples_limit=32` \
 `python data_prep/create_meta_files.py <path for 16 kHz data> egs/vctk/4-16 hr --n_samples_limit=32`
 
-## Checkpoints
-
-To avoid training, one can download checkpoints from [here](https://drive.google.com/drive/folders/1KuVJNkR7lZddvufmNsx-uAIluvb5XQ2L?usp=share_link).
-
-
-To link to checkpoint, set path under `checkpoint_file:<path>` in `conf/main_config.yaml.`
-Alternatively, make sure that the checkpoint file is in its corresponding output folder:  
-For each low to high resolution setting, hydra creates a folder under `outputs/`: lr-hr (e.g. `outputs/4-16`), under
-each such folder hydra creates a folder with the experiment name and n_fft and hop_length hyper-paremers (e.g. 
-`aero-nfft=512-hl=256`).
-Make sure that each checkpoint exists beforehand in appropriate output folder, if you download the 
-[outputs](https://drive.google.com/drive/folders/1KuVJNkR7lZddvufmNsx-uAIluvb5XQ2L?usp=share_link) folder and place it 
-under the root directory (which contains `train.py` and `/src`), it should retain the appropriate structure and no 
-renaming should be necessary (make sure that `restart: false'` in `conf/main_config.yaml`)
-
 ## Train
 
 Run `train.py` with `dset` and `experiment` parameters.  
@@ -119,3 +104,28 @@ python predict.py \
   +filename=<absolute path to input file> \
   +output=<absolute path to output directory>
 ```
+
+## Checkpoints
+
+To avoid training, one can download checkpoints
+from [here](https://drive.google.com/drive/folders/1KuVJNkR7lZddvufmNsx-uAIluvb5XQ2L?usp=share_link).
+
+To link to checkpoint when testing or predicting, override/set path under `checkpoint_file:<path>`
+in `conf/main_config.yaml.`  
+e.g.
+
+```
+python test.py \
+  dset=4-16 \
+  experiment=aero_4-16_512_64 \
+  +checkpoint_file=<path to appropriate checkpoint.th file>
+```
+
+Alternatively, make sure that the checkpoint file is in its corresponding output folder:  
+For each low to high resolution setting, hydra creates a folder under `outputs/`: lr-hr (e.g. `outputs/4-16`), under
+each such folder hydra creates a folder with the experiment name and n_fft and hop_length hyper-paremers (e.g.
+`aero-nfft=512-hl=256`). Make sure that each checkpoint exists beforehand in appropriate output folder, if you download
+the
+[outputs](https://drive.google.com/drive/folders/1KuVJNkR7lZddvufmNsx-uAIluvb5XQ2L?usp=share_link) folder and place it
+under the root directory (which contains `train.py` and `/src`), it should retain the appropriate structure and no
+renaming should be necessary (make sure that `restart: false'` in `conf/main_config.yaml`)
