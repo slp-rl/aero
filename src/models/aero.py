@@ -212,7 +212,7 @@ class HDecLayer(nn.Module):
             assert z.shape[-1] == length, (z.shape[-1], length)
         if not self.last:
             z = F.gelu(z)
-        return z, y
+        return z
 
 
 class Aero(nn.Module):
@@ -388,7 +388,6 @@ class Aero(nn.Module):
             pad = True
             if freq and freqs < kernel_size:
                 ker = freqs
-                # pad = False
 
             kw = {
                 'kernel_size': ker,
@@ -482,6 +481,7 @@ class Aero(nn.Module):
     def forward(self, mix, return_spec=False, return_lr_spec=False):
         x = mix
         length = x.shape[-1]
+
         if self.debug:
             logger.info(f'hdemucs in shape: {x.shape}')
 
@@ -521,9 +521,8 @@ class Aero(nn.Module):
 
         for idx, decode in enumerate(self.decoder):
             skip = saved.pop(-1)
-            x, pre = decode(x, skip, lengths.pop(-1))
-            # `pre` contains the output just before final transposed convolution,
-            # which is used when the freq. and time branch separate.
+            x = decode(x, skip, lengths.pop(-1))
+
             if self.debug:
                 logger.info(f'decoder {idx} out shape: {x.shape}')
 
@@ -532,12 +531,15 @@ class Aero(nn.Module):
 
         x = x.view(B, self.out_channels, -1, Fq, T)
         x = x * std[:, None] + mean[:, None]
+
         if self.debug:
             logger.info(f'post view shape: {x.shape}')
 
         x_spec_complex = self._convert_to_complex(x)
+
         if self.debug:
             logger.info(f'x_spec_complex shape: {x_spec_complex.shape}')
+
         x = self._ispec(x_spec_complex)
 
         if self.debug:

@@ -221,6 +221,7 @@ class Solver(object):
                 logger.info('Cross validation...')
                 self.model.eval()
                 with torch.no_grad():
+                    # if valid test equals all of test data, then
                     if self.args.valid_equals_test:
                         evaluate_on_test_data = (epoch + 1) % self.eval_every == 0 or epoch == self.epochs - 1 and self.tt_loader
                         valid_losses, enhanced_filenames = self._get_valid_losses_on_test_data(epoch,
@@ -389,6 +390,8 @@ class Solver(object):
 
         return avg_losses
 
+    # this function is very similar to _run_one_epoch, except it runs on *test* data-loader and returns the names of
+    # enhanced files for later use. Kind of ugly...
     def _get_valid_losses_on_test_data(self, epoch, enhance):
         total_losses = {}
         total_loss = 0
@@ -471,8 +474,6 @@ class Solver(object):
                 losses['generator'].update({'stft': stft_loss})
 
             if self.adversarial_mode:
-                # for the disc_optimizers: necessary to name the adversarial discriminator losses by their
-                # respective discriminators
                 if 'msd_melgan' in self.args.experiment.discriminator_models:
                     generator_losses, discriminator_loss = self._get_melgan_adversarial_loss(pr_time, hr_time)
                     if not self.args.experiment.only_features_loss:
