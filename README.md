@@ -3,6 +3,10 @@ Audio Super Resolution in the Spectral Domain
 
 ## Requirements
 
+Our code uses [hydra](https://hydra.cc/) to set parameters to different experiments.
+
+
+
 ### ViSQOL
 
 Build Bazel and ViSQOL following directions from [here](https://github.com/google/visqol#build).
@@ -64,8 +68,11 @@ python test.py \
 
 ## Predict (on single sample)
 
-Copy/download appropriate `checkpoint.th` file to directory (make sure that the corresponding nfft,hop_length parameters
+- Copy/download appropriate `checkpoint.th` file to directory (make sure that the corresponding nfft,hop_length parameters
 correspond to experiment file)
+- Run predict.py with appending new `filename` and `output` parameters via hydra framework, corresponding to the input file and output directory respectively.
+
+e.g. for upsampling from 4kHz to 16kHz:
 
 ```
 python predict.py \

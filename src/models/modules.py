@@ -1,6 +1,5 @@
 import torch
 from torch import nn
-from torch.nn import functional as F
 
 from src.models.snake import Snake
 from src.models.utils import unfold

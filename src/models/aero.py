@@ -6,7 +6,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from src.models.utils import capture_init, unfold
+from src.models.utils import capture_init
 from src.models.spec import spectro, ispectro
 from src.models.modules import DConv, ScaledEmbedding, FTB
 
@@ -217,30 +217,7 @@ class HDecLayer(nn.Module):
 
 class Aero(nn.Module):
     """
-    Spectrogram and hybrid Demucs model.
-    The spectrogram model has the same structure as Demucs, except the first few layers are over the
-    frequency axis, until there is only 1 frequency, and then it moves to time convolutions.
-    Frequency layers can still access information across time steps thanks to the DConv residual.
-
-    Hybrid model have a parallel time branch. At some layer, the time branch has the same stride
-    as the frequency branch and then the two are combined. The opposite happens in the decoder.
-
-    Models can either use naive iSTFT from masking, Wiener filtering ([Ulhih et al. 2017]),
-    or complex as channels (CaC) [Choi et al. 2020]. Wiener filtering is based on
-    Open Unmix implementation [Stoter et al. 2019].
-
-    The loss is always on the temporal domain, by backpropagating through the above
-    output methods and iSTFT. This allows to define hybrid models nicely. However, this breaks
-    a bit Wiener filtering, as doing more iteration at test time will change the spectrogram
-    contribution, without changing the one from the waveform, which will lead to worse performance.
-    I tried using the residual option in OpenUnmix Wiener implementation, but it didn't improve.
-    CaC on the other hand provides similar performance for hybrid, and works naturally with
-    hybrid models.
-
-    This model also uses frequency embeddings are used to improve efficiency on convolutions
-    over the freq. axis, following [Isik et al. 2020] (https://arxiv.org/pdf/2008.04470.pdf).
-
-    Unlike classic Demucs, there is no resampling here, and normalization is always applied.
+    Deep model for Audio Super Resolution.
     """
 
     @capture_init

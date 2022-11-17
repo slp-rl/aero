@@ -14,7 +14,6 @@ from torch.nn import functional as F
 from torchaudio.functional import resample
 from torch.utils.data import Dataset
 from torchaudio.transforms import Spectrogram
-from torch import stft
 
 from src.data.audio import Audioset
 from src.utils import match_signal

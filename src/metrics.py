@@ -7,11 +7,7 @@ import time
 import numpy as np
 import sox
 import torch
-from pesq import pesq
-from pystoi import stoi
 import torch.nn as nn
-
-from src.models.stft_loss import stft
 
 logger = logging.getLogger(__name__)
 

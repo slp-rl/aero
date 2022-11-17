@@ -1,0 +1,12 @@
+colorlog==5.0.1
+
+hydra-colorlog==1.1.0
+hydra-core==1.1.1
+hyperlink==17.3.1
+HyperPyYAML==1.0.0
+numpy
+sox
+torch
+torchaudio
+torchvision
+wandb

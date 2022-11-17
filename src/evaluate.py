@@ -1,20 +1,15 @@
-import argparse
 import os
 import logging
-
 import PIL
 import torch
 import wandb
 
 from torchaudio.transforms import Spectrogram
-from torch.utils.data import DataLoader
 
 from src.ddp import distrib
-from src.data.datasets import PrHrSet, match_signal
+from src.data.datasets import match_signal
 from src.enhance import save_wavs, save_specs
-from src.log_results import log_results
 from src.metrics import run_metrics
-from src.models.spec import spectro
 from src.utils import LogProgress, bold, convert_spectrogram_to_heatmap
 
 logger = logging.getLogger(__name__)
@@ -238,53 +233,3 @@ def log_to_wandb(pr_signal, hr_signal, lr_signal, lsd, visqol, filename, epoch, 
 
     wandb.log(wandb_dict,
               step=epoch)
-
-#TODO: remove following code. after implementing from test.py?
-
-def get_parser():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('samples_dir', type=str)
-    parser.add_argument('--device', nargs="?", default='cpu', type=str, choices=['cpu', 'cuda'])
-    parser.add_argument('--lr_sr', nargs="?", default=8000, type=int)
-    parser.add_argument('--hr_sr', nargs="?", default=16000, type=int)
-    parser.add_argument('--num_workers', nargs="?", default=1, type=int)
-    parser.add_argument('--wandb_mode', nargs="?", default='online', type=str)
-    parser.add_argument('--wandb_n_files_to_log', nargs="?", default=10, type=int)
-    parser.add_argument('--n_bins', nargs="?", default=5, type=int)
-    parser.add_argument('--log_results', action='store_false')
-
-
-    return parser
-
-def update_args(args):
-    d = vars(args)
-    experiment = argparse.Namespace()
-    experiment.name = 'nuwave-singlespeaker'
-    experiment.lr_sr = args.lr_sr
-    experiment.hr_sr = args.hr_sr
-    d['experiment'] = experiment
-
-
-if __name__ == "__main__":
-    parser = get_parser()
-    args = parser.parse_args()
-    samples_dir = args.samples_dir
-    print(args)
-    update_args(args)
-    print(args)
-
-    logger.info("For logs, checkpoints and samples check %s", os.getcwd())
-    logger.debug(args)
-
-
-    wandb_mode = os.environ['WANDB_MODE'] if 'WANDB_MODE' in os.environ.keys() else args.wandb_mode
-    wandb.init(mode=wandb_mode, project=WANDB_PROJECT_NAME, entity=WANDB_ENTITY, config=args, group='single-speaker-8-16')
-
-    data_set = PrHrSet(samples_dir)
-    dataloader = DataLoader(data_set, batch_size=1, shuffle=False)
-    avg_lsd, avg_visqol = evaluate_on_saved_data(args, dataloader, epoch=0)
-
-    log_results(args, dataloader, epoch=0)
-
-    print(f'lsd: {avg_lsd}, visqol: {avg_visqol}')
-    print('done evaluating.')

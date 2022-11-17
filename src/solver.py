@@ -4,7 +4,6 @@ This code is based on Facebook's HDemucs code: https://github.com/facebookresear
 
 import json
 import logging
-import shutil
 from pathlib import Path
 import os
 import time
@@ -20,12 +19,9 @@ from src.data.datasets import PrHrSet, match_signal
 from src.enhance import enhance, save_wavs, save_specs
 from src.evaluate import evaluate, evaluate_on_saved_data
 from src.log_results import log_results
-from src.models.discriminators import MultiPeriodDiscriminator, MultiScaleDiscriminator, discriminator_loss, feature_loss, \
-    generator_loss
+from src.models.discriminators import discriminator_loss, feature_loss, generator_loss
 from src.models.stft_loss import MultiResolutionSTFTLoss
 from src.utils import bold, copy_state, pull_metric, serialize_model, swap_state, LogProgress
-
-from torchaudio.functional import resample
 
 logger = logging.getLogger(__name__)
 
