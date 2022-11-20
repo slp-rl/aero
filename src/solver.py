@@ -29,7 +29,6 @@ logger = logging.getLogger(__name__)
 
 
 GENERATOR_KEY = 'generator'
-GENERATOR_OPTIMIZER_KEY = 'generator_optimizer'
 
 METRICS_KEY_EVALUATION_LOSS = 'evaluation_loss'
 METRICS_KEY_BEST_LOSS = 'best_loss'
