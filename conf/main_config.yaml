@@ -12,7 +12,7 @@ verbose: 0
 show: 0   # just show the model and its size and exit
 
 # log results
-log_results: false
+log_results: true
 
 # Checkpointing, by default automatically load last checkpoint
 checkpoint: true
@@ -51,7 +51,7 @@ wandb:
   log: all # gradients/parameters/all/None
   log_freq: 5
   n_files_to_log: 10 # number or -1 for all files
-  n_files_to_log_to_table: 20 # TODO: implement usage.
+  n_files_to_log_to_table: 10
   tags: [ ]
   resume: false
 

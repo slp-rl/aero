@@ -27,6 +27,10 @@ def _init_wandb_run(args, train=True):
     tags = args.wandb.tags
     wandb_mode = os.environ['WANDB_MODE'] if 'WANDB_MODE' in os.environ.keys() else args.wandb.mode
     logger.info(f'current path: {os.getcwd()}, rank: {args.rank}')
+    if args.ddp:
+        experiment_name = args.experiment.name + f'-rank={args.rank}'
+    else:
+        experiment_name = args.experiment.name
     if train and args.ddp and args.wandb.resume:
         group_id_path = os.path.join(os.getcwd(), 'group_id.dat')
         if not os.path.exists(group_id_path):
@@ -39,12 +43,12 @@ def _init_wandb_run(args, train=True):
                    config=_get_wandb_config(args),
                    group=os.path.basename(args.dset.name),
                    id=f"{group_id}-worker-{args.rank}", job_type="worker",
-                   resume='allow', name=args.experiment.name,
+                   resume='allow', name=experiment_name,
                    tags=tags)
     else:
         wandb.init(mode=wandb_mode, project=args.wandb.project_name, entity=args.wandb.entity,
                    config=_get_wandb_config(args),
-                   group=os.path.basename(args.dset.name), resume=args.wandb.resume, name=args.experiment.name,
+                   group=os.path.basename(args.dset.name), resume=args.wandb.resume, name=experiment_name,
                    tags=tags)
 
 
@@ -105,6 +109,8 @@ def create_wandb_table(args, data_loader, epoch):
     wandb_table = init_wandb_table()
 
     for i, data in enumerate(data_loader):
+        if args.wandb.n_files_to_log_to_table and i >= args.wandb.n_files_to_log_to_table:
+            break
         lr, hr, pr, filename = data
         filename = filename[0]
         lsd, visqol = run_metrics(hr, pr, args, filename)
