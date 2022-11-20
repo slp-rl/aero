@@ -1,8 +1,8 @@
 defaults:
   - experiment: debug
   - dset: debug
-  - hydra/job_logging: colorlog
-  - hydra/hydra_logging: colorlog
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
 
 # Logging and printing, and does not impact training
 num_prints: 5

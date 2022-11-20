@@ -8,6 +8,12 @@ Checkpoint files are available! Details below.
 Install requirements specified in `requirements.txt`:  
 ```pip install -r requirments.txt```
 
+We ran our code on CUDA/11.3, we therefore installed pytorch/torchvision/torchaudio with the following:
+
+```
+pip install torch==1.12.1+cu113 torchvision==0.13.1+cu113 torchaudio==0.12.1 --extra-index-url https://download.pytorch.org/whl/cu113
+```
+
 Our code uses [hydra](https://hydra.cc/) to set parameters to different experiments.
 
 ### ViSQOL
@@ -15,7 +21,8 @@ Our code uses [hydra](https://hydra.cc/) to set parameters to different experime
 If you want to run code without using ViSQOL, set `visqol: False` in file: `conf/main_config.yaml`.
 
 In order to evaluate model output with the [ViSQOL](https://github.com/google/visqol) metric, one first needs to install 
-Bazel and then ViSQOL.
+Bazel and then ViSQOL.  
+In our code, we use ViSQOL via its command line API by using a Python subprocess.
 
 Build Bazel and ViSQOL following directions from [here](https://github.com/google/visqol#build).
 
@@ -69,6 +76,11 @@ Run `train.py` with `dset` and `experiment` parameters.
 e.g. for upsampling from 4kHz to 16kHz, with `n_fft=512` and `hop_length=64`:
 ```
 python train.py dset=4-16 experiment=aero_4-16_512_64
+```
+
+To train with multiple GPUs, run with parameter `ddp=true`. e.g.
+```
+python train.py dset=4-16 experiment=aero_4-16_512_64 ddp=true
 ```
 
 ## Test (on whole dataset)
