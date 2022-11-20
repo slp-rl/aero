@@ -24,6 +24,7 @@ from src.models.discriminators import discriminator_loss, feature_loss, generato
 from src.models.stft_loss import MultiResolutionSTFTLoss
 from src.utils import bold, copy_state, pull_metric, swap_state, LogProgress
 from src.wandb_logger import create_wandb_table
+from src.models.spec import spectro
 
 logger = logging.getLogger(__name__)
 
@@ -369,11 +370,19 @@ class Solver(object):
 
             filename = Path(hr_path[0]).stem
             total_filenames += filename
+            if self.args.experiment.model == 'aero':
+                hr_spec = self.model._spec(hr, scale=True).detach()
+                pr_time, pr_spec, lr_spec = self.dmodel(lr, return_spec=True, return_lr_spec=True)
+                pr_spec = pr_spec.detach()
+                lr_spec = lr_spec.detach()
+            else:
+                nfft = self.args.experiment.nfft
+                win_length = nfft // 4
+                pr_time = self.model(lr)
+                pr_spec = spectro(pr_time, n_fft=nfft, win_length=win_length)
+                lr_spec = spectro(lr, n_fft=nfft, win_length=win_length)
+                hr_spec = spectro(hr, n_fft=nfft, win_length=win_length)
 
-            hr_spec = self.model._spec(hr, scale=True).detach()
-            pr_time, pr_spec, lr_spec = self.dmodel(lr, return_spec=True, return_lr_spec=True)
-            pr_spec = pr_spec.detach()
-            lr_spec = lr_spec.detach()
             pr_time = match_signal(pr_time, hr.shape[-1])
 
             if enhance:

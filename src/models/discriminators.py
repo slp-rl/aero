@@ -1,22 +1,13 @@
 from torch import nn
 import torch
-from torch.nn.utils import weight_norm
+from torch.nn.utils import weight_norm, spectral_norm
 from torch.nn import Conv1d, AvgPool1d, Conv2d
 import torch.nn.functional as F
 
+from src.models.modules import WNConv1d
+from src.models.utils import weights_init
 from src.utils import capture_init
 
-def WNConv1d(*args, **kwargs):
-    return weight_norm(nn.Conv1d(*args, **kwargs))
-
-
-def weights_init(m):
-    classname = m.__class__.__name__
-    if classname.find("Conv") != -1:
-        m.weight.data.normal_(0.0, 0.02)
-    elif classname.find("BatchNorm2d") != -1:
-        m.weight.data.normal_(1.0, 0.02)
-        m.bias.data.fill_(0)
 
 # Melgan discriminator
 

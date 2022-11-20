@@ -1,10 +1,18 @@
 import torch
 from torch import nn
+from torch.nn.utils import weight_norm
 
 from src.models.snake import Snake
 from src.models.utils import unfold
 
 import typing as tp
+
+def WNConv1d(*args, **kwargs):
+    return weight_norm(nn.Conv1d(*args, **kwargs))
+
+
+def WNConvTranspose1d(*args, **kwargs):
+    return weight_norm(nn.ConvTranspose1d(*args, **kwargs))
 
 class BLSTM(nn.Module):
     """
@@ -318,5 +326,3 @@ class FTB(nn.Module):
         cat_out = torch.cat([att_out, inputs], 1)
         outputs = self.conv2(cat_out)
         return outputs
-
-

@@ -9,6 +9,7 @@ from src.enhance import save_wavs, save_specs
 from src.metrics import run_metrics
 from src.utils import LogProgress, bold
 from src.wandb_logger import log_data_to_wandb
+from src.models.spec import spectro
 
 logger = logging.getLogger(__name__)
 
@@ -59,11 +60,19 @@ def evaluate_lr_hr_data(data, model, wandb_n_files_to_log, files_to_log, epoch, 
     else:
         lr_sr = args.experiment.lr_sr if 'experiment' in args else args.lr_sr
     model.eval()
-    with torch.no_grad():
-        pr, pr_spec, lr_spec = model(lr, return_spec=True, return_lr_spec=True)
+    if args.experiment.model == 'aero':
+        with torch.no_grad():
+            pr, pr_spec, lr_spec = model(lr, return_spec=True, return_lr_spec=True)
+        pr = match_signal(pr, hr.shape[-1])
+        hr_spec = model._spec(hr, scale=True)
+    else:
+        nfft= args.experiment.nfft
+        win_length= nfft//4
+        pr = model(lr)
+        pr_spec = spectro(pr, n_fft=nfft, win_length=win_length)
+        lr_spec = spectro(lr, n_fft=nfft, win_length=win_length)
+        hr_spec = spectro(hr, n_fft=nfft, win_length=win_length)
     model.train()
-    pr = match_signal(pr, hr.shape[-1])
-    hr_spec = model._spec(hr, scale=True)
     filename = Path(hr_path[0]).stem
 
     if wandb_n_files_to_log == -1 or len(files_to_log) < wandb_n_files_to_log:
