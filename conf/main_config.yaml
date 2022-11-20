@@ -51,7 +51,7 @@ wandb:
   log: all # gradients/parameters/all/None
   log_freq: 5
   n_files_to_log: 10 # number or -1 for all files
-  n_files_to_log_to_table: 10
+  n_files_to_log_to_table: 10 # this is for the results table at the end of run
   tags: [ ]
   resume: false
 
