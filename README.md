@@ -119,7 +119,7 @@ python predict.py \
 
 ## Checkpoints
 
-To avoid training, one can download checkpoints
+To use pre-trained models, one can download checkpoints
 from [here](https://drive.google.com/drive/folders/1KuVJNkR7lZddvufmNsx-uAIluvb5XQ2L?usp=share_link).
 
 To link to checkpoint when testing or predicting, override/set path under `checkpoint_file:<path>`

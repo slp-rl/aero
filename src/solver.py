@@ -18,10 +18,10 @@ from src.ddp import distrib
 from src.data.datasets import PrHrSet, match_signal
 from src.enhance import enhance, save_wavs, save_specs
 from src.evaluate import evaluate, evaluate_on_saved_data
-from src.log_results import log_results
 from src.models.discriminators import discriminator_loss, feature_loss, generator_loss
 from src.models.stft_loss import MultiResolutionSTFTLoss
 from src.utils import bold, copy_state, pull_metric, serialize_model, swap_state, LogProgress
+from src.wandb_logger import create_wandb_table
 
 logger = logging.getLogger(__name__)
 
@@ -289,7 +289,8 @@ class Solver(object):
                             enhanced_dataset = PrHrSet(self.args.samples_dir, enhanced_filenames)
                             enhanced_dataloader = DataLoader(enhanced_dataset, batch_size=1, shuffle=False)
 
-                        log_results(self.args, enhanced_dataloader, epoch)
+                        logger.info('logging results to wandb...')
+                        create_wandb_table(self.args, enhanced_dataloader, epoch)
 
 
                     logger.info(bold(f'Evaluation Time {time.time() - evaluation_start:.2f}s'))

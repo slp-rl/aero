@@ -45,6 +45,8 @@ evaluate_on_best: False
 
 #wand_b
 wandb:
+  project_name: 'Spectral Bandwidth Extension'
+  entity: #optional, must exist beforehand in wandb account
   mode: online  # online/offline/disabled
   log: all # gradients/parameters/all/None
   log_freq: 5

@@ -2,20 +2,15 @@ import os
 import logging
 import PIL
 import torch
-import wandb
-
-from torchaudio.transforms import Spectrogram
 
 from src.ddp import distrib
 from src.data.datasets import match_signal
 from src.enhance import save_wavs, save_specs
 from src.metrics import run_metrics
-from src.utils import LogProgress, bold, convert_spectrogram_to_heatmap
+from src.utils import LogProgress, bold
+from src.wandb_logger import log_data_to_wandb
 
 logger = logging.getLogger(__name__)
-
-WANDB_PROJECT_NAME = 'Spectral Bandwidth Extension'
-WANDB_ENTITY = 'huji-dl-audio-lab' # TODO: move to args/user input
 
 
 
@@ -27,7 +22,7 @@ def evaluate_lr_hr_pr_data(data, wandb_n_files_to_log, files_to_log, epoch, args
         lr_sr = hr_sr
     else:
         lr_sr = args.experiment.lr_sr if 'experiment' in args else args.lr_sr
-    # logger.info(f'evaluating on {filename}')
+
     if wandb_n_files_to_log == -1 or len(files_to_log) < wandb_n_files_to_log:
         files_to_log.append(filename)
 
@@ -45,8 +40,8 @@ def evaluate_lr_hr_pr_data(data, wandb_n_files_to_log, files_to_log, epoch, args
 
     lsd_i, visqol_i = run_metrics(hr, pr, args, filename)
     if filename in files_to_log:
-        log_to_wandb(pr, hr, lr, lsd_i, visqol_i,
-                     filename, epoch, lr_sr, hr_sr, lr_spec, pr_spec, hr_spec)
+        log_data_to_wandb(pr, hr, lr, lsd_i, visqol_i,
+                          filename, epoch, lr_sr, hr_sr, lr_spec, pr_spec, hr_spec)
 
     return {'lsd': lsd_i, 'visqol': visqol_i, 'filename': filename}
 
@@ -81,8 +76,8 @@ def evaluate_lr_hr_data(data, model, wandb_n_files_to_log, files_to_log, epoch, 
 
     lsd_i, visqol_i = run_metrics(hr, pr, args, filename)
     if filename in files_to_log:
-        log_to_wandb(pr, hr, lr, lsd_i, visqol_i,
-                     filename, epoch, lr_sr, hr_sr, lr_spec.cpu(), pr_spec.cpu(), hr_spec.cpu())
+        log_data_to_wandb(pr, hr, lr, lsd_i, visqol_i,
+                          filename, epoch, lr_sr, hr_sr, lr_spec.cpu(), pr_spec.cpu(), hr_spec.cpu())
 
     if enhance:
         os.makedirs(args.samples_dir, exist_ok=True)
@@ -120,7 +115,6 @@ def evaluate_on_saved_data(args, data_loader, epoch):
             total_cnt += 1
 
     if lsd_count != 0:
-        # avg_lsd, = distrib.average([total_lsd / lsd_count], lsd_count)
         avg_lsd, = [total_lsd / lsd_count]
     else:
         avg_lsd = 0
@@ -180,56 +174,3 @@ def evaluate(args, data_loader, epoch, model):
         f'{args.experiment.name}, {args.experiment.lr_sr}->{args.experiment.hr_sr}. Test set performance:'
                                 f'LSD={avg_lsd} ({lsd_count}/{total_cnt}), VISQOL={avg_visqol} ({visqol_count}/{total_cnt}).'))
     return avg_lsd, avg_visqol, total_filenames
-
-
-def log_to_wandb(pr_signal, hr_signal, lr_signal, lsd, visqol, filename, epoch, lr_sr, hr_sr, lr_spec=None, pr_spec=None, hr_spec=None):
-    spectrogram_transform = Spectrogram()
-    enhanced_spectrogram = spectrogram_transform(pr_signal).log2()[0, :, :].numpy()
-    enhanced_spectrogram_wandb_image = wandb.Image(convert_spectrogram_to_heatmap(enhanced_spectrogram),
-                                                   caption='PR')
-    enhanced_wandb_audio = wandb.Audio(pr_signal.squeeze().numpy(), sample_rate=hr_sr, caption='PR')
-
-    wandb_dict = {f'test samples/{filename}/lsd': lsd,
-                  f'test samples/{filename}/visqol': visqol,
-                  f'test samples/{filename}/spectrogram': enhanced_spectrogram_wandb_image,
-                  f'test samples/{filename}/audio': enhanced_wandb_audio}
-
-    if pr_spec is not None and hr_spec is not None and lr_spec is not None:
-        if not isinstance(pr_spec, PIL.Image.Image):
-            pr_spec = pr_spec.abs().pow(2).log2()[0,:,:].numpy()
-            pr_spec = convert_spectrogram_to_heatmap(pr_spec)
-        enhanced_pr_spectrogram_wandb_image = wandb.Image(pr_spec, caption='PR spec')
-        wandb_dict.update({f'test samples/{filename}/pr_spec': enhanced_pr_spectrogram_wandb_image})
-
-        if epoch <= 10:
-            if not isinstance(hr_spec, PIL.Image.Image):
-                hr_spec = hr_spec.abs().pow(2).log2()[0, :, :].numpy()
-                hr_spec = convert_spectrogram_to_heatmap(hr_spec)
-            enhanced_hr_spectrogram_wandb_image = wandb.Image(hr_spec, caption='HR spec')
-            wandb_dict.update({f'test samples/{filename}/hr_spec': enhanced_hr_spectrogram_wandb_image})
-
-            if not isinstance(lr_spec, PIL.Image.Image):
-                lr_spec = lr_spec.abs().pow(2).log2()[0, :, :].numpy()
-                lr_spec = convert_spectrogram_to_heatmap(lr_spec)
-            enhanced_lr_spectrogram_wandb_image = wandb.Image(lr_spec, caption='LR spec')
-            wandb_dict.update({f'test samples/{filename}/lr_spec': enhanced_lr_spectrogram_wandb_image})
-
-    if epoch <= 10:
-        hr_name = f'{filename}_hr'
-        hr_enhanced_spectrogram = spectrogram_transform(hr_signal).log2()[0, :, :].numpy()
-        hr_enhanced_spectrogram_wandb_image = wandb.Image(convert_spectrogram_to_heatmap(hr_enhanced_spectrogram),
-                                                       caption='HR')
-        hr_enhanced_wandb_audio = wandb.Audio(hr_signal.squeeze().numpy(), sample_rate=hr_sr, caption='HR')
-        wandb_dict.update({f'test samples/{filename}/{hr_name}_spectrogram': hr_enhanced_spectrogram_wandb_image,
-                               f'test samples/{filename}/{hr_name}_audio': hr_enhanced_wandb_audio})
-
-        lr_name = f'{filename}_lr'
-        lr_enhanced_spectrogram = spectrogram_transform(lr_signal).log2()[0, :, :].numpy()
-        lr_enhanced_spectrogram_wandb_image = wandb.Image(convert_spectrogram_to_heatmap(lr_enhanced_spectrogram),
-                                                          caption='LR')
-        lr_enhanced_wandb_audio = wandb.Audio(lr_signal.squeeze().numpy(), sample_rate=lr_sr, caption='LR')
-        wandb_dict.update({f'test samples/{filename}/{lr_name}_spectrogram': lr_enhanced_spectrogram_wandb_image,
-                           f'test samples/{filename}/{lr_name}_audio': lr_enhanced_wandb_audio})
-
-    wandb.log(wandb_dict,
-              step=epoch)

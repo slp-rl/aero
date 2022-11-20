@@ -14,11 +14,9 @@ from src.ddp import distrib
 from src.evaluate import evaluate
 from src.models import modelFactory
 from src.utils import bold
+from src.wandb_logger import _init_wandb_run
 
 logger = logging.getLogger(__name__)
-
-WANDB_PROJECT_NAME = 'Spectral Bandwidth Extension'
-WANDB_ENTITY = 'huji-dl-audio-lab'  # TODO: more to args/ user input
 
 SERIALIZE_KEY_MODELS = 'models'
 SERIALIZE_KEY_BEST_STATES = 'best_states'
@@ -53,23 +51,6 @@ def run(args):
     logger.info(f'Done evaluation.')
     logger.info(f'LSD={lsd} , VISQOL={visqol}')
 
-
-
-def _get_wandb_config(args):
-    included_keys = ['eval_every', 'optim', 'lr', 'losses', 'epochs']
-    wandb_config = {k: args[k] for k in included_keys}
-    wandb_config.update(**args.experiment)
-    wandb_config.update({'train': args.dset.train, 'test': args.dset.test})
-    return wandb_config
-
-
-def _init_wandb_run(args):
-    tags = args.wandb.tags
-    wandb_mode = os.environ['WANDB_MODE'] if 'WANDB_MODE' in os.environ.keys() else args.wandb.mode
-    logger.info(f'current path: {os.getcwd()}, rank: {args.rank}')
-    wandb.init(mode=wandb_mode, project=WANDB_PROJECT_NAME, entity=WANDB_ENTITY, config=_get_wandb_config(args),
-               group=os.path.basename(args.dset.name), resume=args.wandb.resume, name=args.experiment.name,
-               tags=tags)
 
 
 def _main(args):
