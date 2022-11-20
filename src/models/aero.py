@@ -227,28 +227,22 @@ class Aero(nn.Module):
                  out_channels=1,
                  audio_channels=2,
                  channels=48,
-                 channels_time=None,
                  growth=2,
                  # STFT
                  nfft=512,
                  hop_length=64,
-                 wiener_iters=0,
                  end_iters=0,
-                 wiener_residual=False,
                  cac=True,
                  # Main structure
                  rewrite=True,
                  hybrid=False,
                  hybrid_old=False,
                  # Frequency branch
-                 multi_freqs=None,
-                 multi_freqs_depth=2,
                  freq_emb=0.2,
                  emb_scale=10,
                  emb_smooth=True,
                  # Convolutions
                  kernel_size=8,
-                 time_stride=2,
                  strides=[4, 4, 2, 2],
                  context=1,
                  context_enc=0,
@@ -267,8 +261,6 @@ class Aero(nn.Module):
                  # Weight init
                  rescale=0.1,
                  # Metadata
-                 samplerate=44100,
-                 segment=4 * 10,
                  lr_sr=4000,
                  hr_sr=16000,
                  spec_upsample=True,
@@ -279,13 +271,10 @@ class Aero(nn.Module):
             sources (list[str]): list of source names.
             audio_channels (int): input/output audio channels.
             channels (int): initial number of hidden channels.
-            channels_time: if not None, use a different `channels` value for the time branch.
             growth: increase the number of hidden channels by this factor at each layer.
             nfft: number of fft bins. Note that changing this require careful computation of
                 various shape parameters and will not work out of the box for hybrid models.
-            wiener_iters: when using Wiener filtering, number of iterations at test time.
             end_iters: same but at train time. For a hybrid model, must be equal to `wiener_iters`.
-            wiener_residual: add residual source before wiener filtering.
             cac: uses complex as channels, i.e. complex numbers are 2 channels each
                 in input and output. no further processing is done before ISTFT.
             depth (int): number of layers in the encoder and in the decoder.
@@ -293,16 +282,12 @@ class Aero(nn.Module):
             hybrid (bool): make a hybrid time/frequency domain, otherwise frequency only.
             hybrid_old: some models trained for MDX had a padding bug. This replicates
                 this bug to avoid retraining them.
-            multi_freqs: list of frequency ratios for splitting frequency bands with `MultiWrap`.
-            multi_freqs_depth: how many layers to wrap with `MultiWrap`. Only the outermost
-                layers will be wrapped.
             freq_emb: add frequency embedding after the first frequency layer if > 0,
                 the actual value controls the weight of the embedding.
             emb_scale: equivalent to scaling the embedding learning rate
             emb_smooth: initialize the embedding with a smooth one (with respect to frequencies).
             kernel_size: kernel_size for encoder and decoder layers.
             stride: stride for encoder and decoder layers.
-            time_stride: stride for the final time layer, after the merge.
             context: context for 1x1 conv in the decoder.
             context_enc: context for 1x1 conv in the encoder.
             norm_starts: layer at which group norm starts being used.
@@ -316,7 +301,11 @@ class Aero(nn.Module):
             dconv_lstm: adds a LSTM layer in DConv branch starting at this layer.
             dconv_init: initial scale for the DConv branch LayerScale.
             rescale: weight recaling trick
-
+            lr_sr: source low-resolution sample-rate
+            hr_sr: target high-resolution sample-rate
+            spec_upsample: if true, upsamples in the spectral domain, otherwise performs sinc-interpolation beforehand
+            act_func: 'snake'/'relu'
+            debug: if true, prints out input dimensions throughout model layers.
         """
         super().__init__()
         self.cac = cac
@@ -328,7 +317,6 @@ class Aero(nn.Module):
         self.strides = strides
         self.depth = len(strides)
         self.channels = channels
-        self.samplerate = samplerate
         self.lr_sr = lr_sr
         self.hr_sr = hr_sr
         self.spec_upsample = spec_upsample

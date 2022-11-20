@@ -10,7 +10,7 @@ pad: true   # if training sample is too short, pad it
 upsample: false
 batch_size: 16
 nfft: 512
-hop_length: # to fill in from command line
+hop_length: # override from command line
 
 # models related
 model: aero
@@ -19,29 +19,23 @@ aero: # see aero.py for a detailed description
   out_channels: 1
   # Channels
   channels: 48
-  channels_time:
   growth: 2
   # STFT
   nfft: ${experiment.nfft}
   hop_length: ${experiment.hop_length}
-  wiener_iters: 0
   end_iters: 0
-  wiener_residual: false
   cac: true
   # Main structure
   rewrite: true
   hybrid: false
   hybrid_old: false
   # Frequency Branch
-  multi_freqs: [ ]
-  multi_freqs_depth: 3
   freq_emb: 0.2
   emb_scale: 10
   emb_smooth: true
   # Convolutions
   kernel_size: 8
   strides: [ 4,4,2,2 ]
-  time_stride: 2
   context: 1
   context_enc: 0
   freq_ends: 4
