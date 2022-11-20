@@ -18,19 +18,15 @@ from src.ddp import distrib
 from src.data.datasets import PrHrSet, match_signal
 from src.enhance import enhance, save_wavs, save_specs
 from src.evaluate import evaluate, evaluate_on_saved_data
+from src.model_serializer import SERIALIZE_KEY_BEST_STATES, SERIALIZE_KEY_MODELS, SERIALIZE_KEY_OPTIMIZERS,  \
+    SERIALIZE_KEY_STATE, SERIALIZE_KEY_HISTORY, serialize
 from src.models.discriminators import discriminator_loss, feature_loss, generator_loss
 from src.models.stft_loss import MultiResolutionSTFTLoss
-from src.utils import bold, copy_state, pull_metric, serialize_model, swap_state, LogProgress
+from src.utils import bold, copy_state, pull_metric, swap_state, LogProgress
 from src.wandb_logger import create_wandb_table
 
 logger = logging.getLogger(__name__)
 
-SERIALIZE_KEY_MODELS = 'models'
-SERIALIZE_KEY_OPTIMIZERS = 'optimizers'
-SERIALIZE_KEY_HISTORY = 'history'
-SERIALIZE_KEY_STATE = 'state'
-SERIALIZE_KEY_BEST_STATES = 'best_states'
-SERIALIZE_KEY_ARGS = 'args'
 
 GENERATOR_KEY = 'generator'
 GENERATOR_OPTIMIZER_KEY = 'generator_optimizer'
@@ -103,42 +99,6 @@ class Solver(object):
         for name, model in self.models.items():
             states[name] = copy_state(model.state_dict())
         return states
-
-    def _serialize_models(self):
-        serialized_models = {}
-        for name, model in self.models.items():
-            serialized_models[name] = serialize_model(model)
-        return serialized_models
-
-    def _serialize_optimizers(self):
-        serialized_optimizers = {}
-        for name, optimizer in self.optimizers.items():
-            serialized_optimizers[name] = optimizer.state_dict()
-        return serialized_optimizers
-
-    def _serialize(self):
-        package = {}
-        package[SERIALIZE_KEY_MODELS] = self._serialize_models()
-        package[SERIALIZE_KEY_OPTIMIZERS] = self._serialize_optimizers()
-        package[SERIALIZE_KEY_HISTORY] = self.history
-        package[SERIALIZE_KEY_BEST_STATES] = self.best_states
-        package[SERIALIZE_KEY_ARGS] = self.args
-        tmp_path = str(self.checkpoint_file) + ".tmp"
-        torch.save(package, tmp_path)
-        # renaming is sort of atomic on UNIX (not really true on NFS)
-        # but still less chances of leaving a half written checkpoint behind.
-        os.rename(tmp_path, self.checkpoint_file)
-
-        # Saving only the latest best model.
-        models = package[SERIALIZE_KEY_MODELS]
-        for model_name, best_state in package[SERIALIZE_KEY_BEST_STATES].items():
-            models[model_name][SERIALIZE_KEY_STATE] = best_state
-            model_filename = model_name + '_' + self.best_file.name
-            tmp_path = os.path.join(self.best_file.parent, model_filename) + ".tmp"
-            torch.save(models[model_name], tmp_path)
-            model_path = Path(self.best_file.parent / model_filename)
-            os.rename(tmp_path, model_path)
-
 
     def _load(self, package, load_best=False):
         if load_best:
@@ -237,6 +197,7 @@ class Solver(object):
                 if evaluation_loss == best_loss:
                     logger.info(bold('New best valid loss %.4f'), evaluation_loss)
                     self.best_states = self._copy_models_states()
+                    # a bit weird that we don't save/load optimizers' best states. Should we?
 
 
 
@@ -309,7 +270,7 @@ class Solver(object):
                 json.dump(self.history, open(self.history_file, "w"), indent=2)
                 # Save model each epoch
                 if self.checkpoint:
-                    self._serialize()
+                    serialize(self.models, self.optimizers, self.history, self.best_states, self.args)
                     logger.debug("Checkpoint saved to %s", self.checkpoint_file.resolve())
 
 
