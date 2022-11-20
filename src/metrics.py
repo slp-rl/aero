@@ -22,7 +22,7 @@ def run_metrics(clean, estimate, args, filename):
 
 
 def get_metrics(clean, estimate, sr, filename, speech_mode, args):
-    calc_visqol = args.visqol
+    calc_visqol = args.visqol and args.visqol_path
     visqol_path = args.visqol_path
     clean = clean.squeeze(dim=1)
     estimate = estimate.squeeze(dim=1)
