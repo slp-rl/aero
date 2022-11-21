@@ -70,7 +70,6 @@ def enhance(dataloader, model, args):
 
         estimates = get_estimate(model, lr_sigs)
         save_wavs(estimates, lr_sigs, hr_sigs, filenames, lr_sr, hr_sr)
-        # save_specs(lr_spec, pr_spec, hr_spec, os.path.join(args.samples_dir, filename))
 
         if i == args.enhance_samples_limit:
             break

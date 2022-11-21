@@ -179,9 +179,9 @@ class Solver(object):
                 with torch.no_grad():
                     # if valid test equals all of test data, then
                     if self.args.valid_equals_test:
-                        evaluate_on_test_data = (epoch + 1) % self.eval_every == 0 or epoch == self.epochs - 1 and self.tt_loader
+                        enhance_valid_data = (epoch + 1) % self.eval_every == 0 or epoch == self.epochs - 1 and self.tt_loader
                         valid_losses, enhanced_filenames = self._get_valid_losses_on_test_data(epoch,
-                                                                                       enhance=evaluate_on_test_data)
+                                                                                       enhance=enhance_valid_data)
                         evaluated_on_test_data = True
                     else:
                         valid_losses = self._run_one_epoch(epoch, cross_valid=True)

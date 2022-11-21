@@ -13,16 +13,13 @@ from torchaudio.functional import resample
 
 from src.enhance import write
 from src.models import modelFactory
+from src.model_serializer import SERIALIZE_KEY_MODELS, SERIALIZE_KEY_BEST_STATES, SERIALIZE_KEY_STATE
 from src.utils import bold
 
 logger = logging.getLogger(__name__)
 
 
 SEGMENT_DURATION_SEC = 10
-
-SERIALIZE_KEY_MODELS = 'models'
-SERIALIZE_KEY_BEST_STATES = 'best_states'
-SERIALIZE_KEY_STATE = 'state'
 
 def _load_model(args):
     model_name = args.experiment.model

@@ -10,7 +10,7 @@ pad: true   # if training sample is too short, pad it
 upsample: false
 batch_size: 16
 nfft: 512
-hop_length: # override from command line
+hop_length: # need to override from command line
 
 # models related
 model: aero
