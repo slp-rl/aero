@@ -1,0 +1,36 @@
+# @package experiment
+name: ${dummy}seanet
+
+# Dataset related
+lr_sr: 4000 # low resolution sample rate, added to support BWE. Should be included in training cfg
+hr_sr: 16000 # high resolution sample rate. Should be included in training cfg
+segment: 2
+stride: 2    # in seconds, how much to stride between training examples
+pad: true   # if training sample is too short, pad it
+upsample: false # this determines upsampling in datset, seanet upsamples audio inside model
+batch_size: 16
+nfft: 512
+
+# models related
+model: seanet
+seanet:
+  latent_space_size: 128
+  ngf: 32
+  n_residual_layers: 3
+  resample: 1
+  normalize: True
+  floor: 1e-3
+  ratios: [ 8,8,2,2 ]
+  lr_sr: ${experiment.lr_sr}
+  hr_sr: ${experiment.hr_sr}
+
+adversarial: True
+features_loss_lambda: 100
+only_features_loss: False
+only_adversarial_loss: False
+discriminator_models: [ msd_melgan ] #msd_melgan/msd_hifi/mpd/hifi
+melgan_discriminator:
+  n_layers: 4
+  num_D: 3
+  downsampling_factor: 4
+  ndf: 16

@@ -1,0 +1,117 @@
+defaults:
+  - experiment: debug
+  - dset: debug
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+# Logging and printing, and does not impact training
+num_prints: 5
+device: cuda
+num_workers: 2
+verbose: 0
+show: 0   # just show the model and its size and exit
+
+# log results
+log_results: true
+
+# Checkpointing, by default automatically load last checkpoint
+checkpoint: true
+continue_from: '' # Path the a checkpoint.th file to start from.
+# this is not used in the name of the experiment!
+# so use a dummy=something not to mixup experiment.
+continue_best: false  # continue from best, not last state if continue_from is set.
+restart: false # Ignore existing checkpoints
+checkpoint_file: checkpoint.th
+best_file: best.th  # will contain only best model at any point
+history_file: history.json
+test_results_file: test_results.json
+samples_dir: samples
+keep_history: true
+
+# Other stuff
+seed: 2036
+dummy: '' # use this if you want twice the same exp, with a different name
+
+# Evaluation stuff
+visqol: True # compute visqol?
+visqol_path: # *INSERT ABSOLUTE PATH TO VISQOL HERE*
+eval_every: 25  # compute test metrics every so epochs
+enhance_samples_limit: -1
+valid_equals_test: # whether valid_dset == test_dset, set in train.py script
+cross_valid: False
+cross_valid_every: 5
+joint_evaluate_and_enhance: True
+evaluate_on_best: False
+
+#wand_b
+wandb:
+  project_name: 'Spectral Bandwidth Extension'
+  entity: #optional, must exist beforehand in wandb account
+  mode: online  # online/offline/disabled
+  log: all # gradients/parameters/all/None
+  log_freq: 5
+  n_files_to_log: 10 # number or -1 for all files
+  n_files_to_log_to_table: 10 # this is for the results table at the end of run
+  tags: [ ]
+  resume: false
+
+# Optimization related
+optim: adam
+lr: 3e-4
+beta1: 0.8
+beta2: 0.999
+losses: [ stft ]
+stft_sc_factor: .5
+stft_mag_factor: .5
+epochs: 125
+
+# Experiment launching, distributed
+ddp: false
+ddp_backend: nccl
+rendezvous_file: ./rendezvous
+
+# Internal config, don't set manually
+rank:
+world_size:
+
+# Hydra config
+hydra:
+  sweep:
+    dir: ./outputs/${dset.name}/${experiment.name}
+    subdir: ${hydra.job.num}
+  run:
+    dir: ./outputs/${dset.name}/${experiment.name}
+  job:
+    config:
+      # configuration for the ${hydra.job.override_dirname} runtime variable
+      override_dirname:
+        kv_sep: '='
+        item_sep: ','
+        # Remove all paths, as the / in them would mess up things
+        # Remove params that would not impact the training itself
+        # Remove all slurm and submit params.
+        # This is ugly I know...
+        exclude_keys: [
+            'hydra.job_logging.handles.file.filename',
+            'dset.train', 'dset.valid', 'dset.test',
+            'num_prints', 'continue_from',
+            'device', 'num_workers', 'print_freq', 'restart', 'verbose',
+            'log' ]
+  job_logging:
+    handlers:
+      file:
+        class: logging.FileHandler
+        mode: w
+        formatter: colorlog
+        filename: trainer.log
+      console:
+        class: logging.StreamHandler
+        formatter: colorlog
+        stream: ext://sys.stderr
+
+  hydra_logging:
+    handlers:
+      console:
+        class: logging.StreamHandler
+        formatter: colorlog
+        stream: ext://sys.stderr
