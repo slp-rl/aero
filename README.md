@@ -140,4 +140,4 @@ each such folder hydra creates a folder with the experiment name and n_fft and h
 the
 [outputs](https://drive.google.com/drive/folders/1KuVJNkR7lZddvufmNsx-uAIluvb5XQ2L?usp=share_link) folder and place it
 under the root directory (which contains `train.py` and `/src`), it should retain the appropriate structure and no
-renaming should be necessary (make sure that `restart: false'` in `conf/main_config.yaml`)
+renaming should be necessary (make sure that `restart: false` in `conf/main_config.yaml`)
