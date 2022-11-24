@@ -38,7 +38,7 @@ def parse_args():
     parser.add_argument('--target_sr', type=int, help='target sample rate')
     return parser.parse_args()
 
-
+"""Usage: python data_prep/resample_data.py --data_dir <path for source data> --out_dir <path for target data> --target_sr <target sample rate>"""
 def main():
     args = parse_args()
     print(args)
