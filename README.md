@@ -44,7 +44,14 @@ Make sure to download the uncompressed WAV version.
 Data are a collection of high/low resolution pairs. Corresponding high and low resolution signals should be in
 different folders.
 
-In order to create each folder, one should run `resample_data` twice: for low and high resolution.
+In order to create each folder, one should run `resample_data` a total of 5 times,
+to include all source/target pairs in both speech and music settings.
+
+For speech, we use 4 lr-hr settings: 8-16 kHz, 8-24 kHz, 4-16 kHz, 12-48 kHz.
+This requires to resample to 4 different resolutions (not including the original 48 kHz):
+4, 8, 16, and 24 kHz.
+
+For music, we downsample once to a target 11.025 kHz, from the original 44.1 kHz.
 
 E.g. for 4 and 16 kHz: \
 `python data_prep/resample_data.py --data_dir <path for 48 kHz data> --out_dir <path for 4 kHz data> --target_sr 4` \
