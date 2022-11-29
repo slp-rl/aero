@@ -30,7 +30,14 @@ Build Bazel and ViSQOL following directions from [here](https://github.com/googl
 
 Add the absolute path of the root directory of ViSQOL (where the WORKSPACE file is), to the `visqol path` parameter in 
 `main_config.yaml`.
-## Preparing Data
+
+## Data
+
+### Download data
+
+For speech we use the [VCTK Corpus](https://datashare.ed.ac.uk/handle/10283/3443). \
+For music we use the mixture tracks of [MUSDB18-HQ](https://sigsep.github.io/datasets/musdb.html#musdb18-hq-uncompressed-wav) dataset.
+Make sure to download the uncompressed WAV version.
 
 ### Resample data
 
