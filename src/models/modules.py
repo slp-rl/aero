@@ -122,10 +122,7 @@ class LocalState(nn.Module):
 
         content = self.content(x).view(B, heads, -1, T)
         result = torch.einsum("bhts,bhct->bhcs", weights, content)
-        # does not make sense to do this, I think...
-        # if self.nfreqs:
-        #     time_sig = torch.einsum("bhts,fts->bhfs", weights, freq_kernel)
-        #     result = torch.cat([result, time_sig], 2)
+
         result = result.reshape(B, -1, T)
         return x + self.proj(result)
 
