@@ -138,8 +138,6 @@ python predict.py \
 To use pre-trained models, one can download checkpoints
 from [here](https://drive.google.com/drive/folders/1KuVJNkR7lZddvufmNsx-uAIluvb5XQ2L?usp=share_link).
 
-Thank you for [@fmac2000](https://github.com/fmac2000) for providing checkpoints for the 16->48 kHz configuration! They are now included in the provided checkpoint folder.
-
 To link to checkpoint when testing or predicting, override/set path under `checkpoint_file:<path>`
 in `conf/main_config.yaml.`  
 e.g.
