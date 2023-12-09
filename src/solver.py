@@ -148,10 +148,8 @@ class Solver(object):
             mb = n_params * 4 / 2 ** 20
             logger.info(f"{name}: parameters: {n_params}, size: {mb} MB")
 
-        torch.set_num_threads(1)
-
         best_loss = None
-        self.best_states = {}
+        if self.best_states == None: self.best_states = {}
 
         for epoch in range(len(self.history), self.epochs):
             # Train one epoch
@@ -198,8 +196,9 @@ class Solver(object):
                     logger.info(bold('New best valid loss %.4f'), evaluation_loss)
                     self.best_states = self._copy_models_states()
                     # a bit weird that we don't save/load optimizers' best states. Should we?
-
-
+            elif not self.cross_valid and (len(self.best_states) == 0 or losses['total_loss'] < min(pull_metric(self.history, 'total_loss'))):
+                    logger.info(bold('New best total loss %.4f'), losses['total_loss'])
+                    self.best_states = self._copy_models_states()
 
             metrics = {**losses, **valid_losses}
 
@@ -289,7 +288,9 @@ class Solver(object):
         # return_spec can be used to debug model and see explicit spectral output of model
         return_spec = 'return_spec' in self.args.experiment and self.args.experiment.return_spec
 
-        for i, data in enumerate(logprog):
+        enumeratedLogprog = enumerate(logprog)
+        for i, data in enumeratedLogprog:
+
             lr, hr = [x.to(self.device) for x in data]
 
             if return_spec:
@@ -363,7 +364,8 @@ class Solver(object):
 
         total_filenames = []
 
-        for i, data in enumerate(logprog):
+        enumeratedLogprog = enumerate(logprog)
+        for i, data in enumeratedLogprog:
             (lr, lr_path), (hr, hr_path) = data
             lr = lr.to(self.device)
             hr = hr.to(self.device)
@@ -447,7 +449,7 @@ class Solver(object):
                     if not self.args.experiment.only_adversarial_loss:
                         losses['generator'].update({'features_melgan': generator_losses['features']})
                     losses['discriminator'].update({'msd_melgan': discriminator_loss})
-                if 'msd_hifi' in self.args.experiment.discriminator_models:
+                if 'msd' in self.args.experiment.discriminator_models:
                     generator_losses, discriminator_loss = self._get_msd_adversarial_loss(pr_time, hr_time)
                     if not self.args.experiment.only_features_loss:
                         losses['generator'].update({'adversarial_msd': generator_losses['adversarial']})
@@ -468,7 +470,10 @@ class Solver(object):
         return losses
 
     def _get_stft_loss(self, pr, hr):
-        sc_loss, mag_loss = self.mrstftloss(pr.squeeze(1), hr.squeeze(1))
+        sc_loss, mag_loss = self.mrstftloss(
+            pr.reshape([pr.shape[0], pr.shape[1] * pr.shape[2]]), 
+            hr.reshape([hr.shape[0], hr.shape[1] * hr.shape[2]])
+            )
         stft_loss = sc_loss + mag_loss
         return stft_loss
 
@@ -555,7 +560,7 @@ class Solver(object):
 
 
     def _get_msd_adversarial_loss(self, pr, hr):
-        msd = self.dmodels['msd_hifi']
+        msd = self.dmodels['msd']
 
         # discriminator loss
         y_ds_hat_r, y_ds_hat_g, _, _ = msd(hr, pr.detach())
