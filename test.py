@@ -73,7 +73,7 @@ def _main(args):
     wandb.finish()
 
 
-@hydra.main(config_path="conf", config_name="main_config")  # for latest version of hydra=1.0
+@hydra.main(config_path="conf", config_name="main_config", version_base="1.1")  # for latest version of hydra=1.0
 def main(args):
     try:
         _main(args)

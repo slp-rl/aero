@@ -60,7 +60,8 @@ def enhance(dataloader, model, args):
 
     iterator = LogProgress(logger, dataloader, name="Generate enhanced files")
 
-    for i, data in enumerate(iterator):
+    enumeratedIterator = enumerate(iterator)
+    for i, data in enumeratedIterator:
         # Get batch data
         (lr_sigs, lr_paths), (hr_sigs, hr_paths) = data
         lr_sigs = lr_sigs.to(args.device)

@@ -30,7 +30,7 @@ def _load_model(args):
     if load_best:
         logger.info(bold(f'Loading model {model_name} from best state.'))
         model.load_state_dict(
-            package[SERIALIZE_KEY_BEST_STATES][SERIALIZE_KEY_MODELS]['generator'][SERIALIZE_KEY_STATE])
+            package[SERIALIZE_KEY_BEST_STATES]['generator'])
     else:
         logger.info(bold(f'Loading model {model_name} from last state.'))
         model.load_state_dict(package[SERIALIZE_KEY_MODELS]['generator'][SERIALIZE_KEY_STATE])
@@ -38,7 +38,7 @@ def _load_model(args):
     return model
 
 
-@hydra.main(config_path="conf", config_name="main_config")  # for latest version of hydra=1.0
+@hydra.main(config_path="conf", config_name="main_config", version_base="1.1")  # for latest version of hydra=1.0
 def main(args):
     global __file__
     __file__ = hydra.utils.to_absolute_path(__file__)

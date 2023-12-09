@@ -50,9 +50,16 @@ def run(args):
     assert args.experiment.batch_size % distrib.world_size == 0
     args.experiment.batch_size //= distrib.world_size
 
+    channels = 1
+    if args.experiment.model == 'aero':
+       channels = args.experiment.aero.in_channels
+    elif args.experiment.model == 'seanet':
+       channels = args.experiment.seanet.in_channels
+
     # Building datasets and loaders
     tr_dataset = LrHrSet(args.dset.train, args.experiment.lr_sr, args.experiment.hr_sr,
-                         args.experiment.stride, args.experiment.segment, upsample=args.experiment.upsample)
+                         args.experiment.stride, args.experiment.segment, upsample=args.experiment.upsample,
+                         channels=channels)
     tr_loader = distrib.loader(tr_dataset, batch_size=args.experiment.batch_size, shuffle=True,
                                num_workers=args.num_workers)
 
@@ -61,14 +68,16 @@ def run(args):
 
     if args.dset.valid:
         cv_dataset = LrHrSet(args.dset.valid, args.experiment.lr_sr, args.experiment.hr_sr,
-                            stride=None, segment=None, upsample=args.experiment.upsample)
+                            stride=None, segment=None, upsample=args.experiment.upsample,
+                            channels=channels)
         cv_loader = distrib.loader(cv_dataset, batch_size=1, shuffle=False, num_workers=args.num_workers)
     else:
         cv_loader = None
 
     if args.dset.test:
         tt_dataset = LrHrSet(args.dset.test, args.experiment.lr_sr, args.experiment.hr_sr,
-                             stride=None, segment=None, with_path=True, upsample=args.experiment.upsample)
+                             stride=None, segment=None, with_path=True, upsample=args.experiment.upsample,
+                             channels=channels)
         tt_loader = distrib.loader(tt_dataset, batch_size=1, shuffle=False, num_workers=args.num_workers)
     else:
         tt_loader = None
@@ -129,7 +138,7 @@ def _main(args):
     wandb.finish()
 
 
-@hydra.main(config_path="conf", config_name="main_config")  # for latest version of hydra=1.0
+@hydra.main(config_path="conf", config_name="main_config", version_base="1.1")  # for latest version of hydra=1.0
 def main(args):
     try:
         _main(args)

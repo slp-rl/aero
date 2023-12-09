@@ -108,7 +108,8 @@ def log_data_to_wandb(pr_signal, hr_signal, lr_signal, lsd, visqol, filename, ep
 def create_wandb_table(args, data_loader, epoch):
     wandb_table = init_wandb_table()
 
-    for i, data in enumerate(data_loader):
+    enumeratedDataloader = enumerate(data_loader)
+    for i, data in enumeratedDataloader:
         if args.wandb.n_files_to_log_to_table and i >= args.wandb.n_files_to_log_to_table:
             break
         lr, hr, pr, filename = data

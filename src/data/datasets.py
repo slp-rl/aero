@@ -82,7 +82,7 @@ class PrHrSet(Dataset):
 class LrHrSet(Dataset):
     def __init__(self, json_dir, lr_sr, hr_sr, stride=None, segment=None,
                  pad=True, with_path=False, stft=False, win_len=64, hop_len=16, n_fft=4096, complex_as_channels=True,
-                 upsample=True):
+                 upsample=True, channels=1):
         """__init__.
         :param json_dir: directory containing both hr.json and lr.json
         :param stride: the stride used for splitting audio sequences in seconds
@@ -127,9 +127,9 @@ class LrHrSet(Dataset):
         hr_length = segment * hr_sr if segment else None
 
         match_files(lr, hr)
-        self.lr_set = Audioset(lr, sample_rate=lr_sr, length=lr_length, stride=lr_stride, pad=pad, channels=1,
+        self.lr_set = Audioset(lr, sample_rate=lr_sr, length=lr_length, stride=lr_stride, pad=pad, channels=channels,
                                with_path=with_path)
-        self.hr_set = Audioset(hr, sample_rate=hr_sr, length=hr_length, stride=hr_stride, pad=pad, channels=1,
+        self.hr_set = Audioset(hr, sample_rate=hr_sr, length=hr_length, stride=hr_stride, pad=pad, channels=channels,
                                with_path=with_path)
         assert len(self.hr_set) == len(self.lr_set)
 

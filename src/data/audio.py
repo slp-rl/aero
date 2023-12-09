@@ -45,13 +45,9 @@ class Audioset:
             if self.length is not None:
                 offset = self.stride * index
                 num_frames = self.length
-            if torchaudio.get_audio_backend() in ['soundfile', 'sox_io']:
-                out, sr = torchaudio.load(str(file),
-                                          frame_offset=offset,
-                                          num_frames=num_frames or -1)
-            else:
-                out, sr = torchaudio.load(str(file), offset=offset, num_frames=num_frames)
-
+            out, sr = torchaudio.load(str(file),
+                                        frame_offset=offset,
+                                        num_frames=num_frames or -1)
 
             if sr != self.sample_rate:
                 raise RuntimeError(f"Expected {file} to have sample rate of "
