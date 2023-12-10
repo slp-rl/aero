@@ -1,0 +1,36 @@
+# @package experiment
+name: seanet-nfft=${experiment.nfft}-hl=${experiment.hop_length}
+
+# Dataset related
+lr_sr: 44100 # low resolution sample rate, added to support BWE. Should be included in training cfg
+hr_sr: 44100 # high resolution sample rate. Should be included in training cfg
+segment: 4
+stride: 4    # in seconds, how much to stride between training examples
+pad: true   # if training sample is too short, pad it
+upsample: false
+batch_size: 1
+nfft: 1024
+hop_length: 512
+
+# models related
+model: seanet
+seanet:
+  latent_space_size: 256
+  ngf: 32
+  n_residual_layers: 4
+  resample: 1
+  normalize: False
+  floor: 5e-4
+  ratios: [ 8,8,2,2 ]
+  lr_sr: ${experiment.lr_sr}
+  hr_sr: ${experiment.hr_sr}
+  in_channels: 2
+  out_channels: 2
+
+adversarial: False
+features_loss_lambda: 100
+only_features_loss: False
+only_adversarial_loss: False
+msd:
+  hidden: 16
+  channels: 2
