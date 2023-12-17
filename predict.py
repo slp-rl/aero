@@ -27,7 +27,9 @@ def _load_model(args):
     model = modelFactory.get_model(args)['generator']
     package = torch.load(checkpoint_file, 'cpu')
     load_best = args.continue_best
-    if load_best:
+    if  'state' in package.keys(): #raw model file
+        model.load_state_dict(package[SERIALIZE_KEY_STATE])
+    elif load_best:
         logger.info(bold(f'Loading model {model_name} from best state.'))
         model.load_state_dict(
             package[SERIALIZE_KEY_BEST_STATES]['generator'])
@@ -95,7 +97,7 @@ def main(args):
 
 """
 Need to add filename and output to args.
-Usage: python predict.py <dset> <experiment> +filename=<path to input file> +output=<path to output dir>
+Usage: python predict.py <experiment> +filename=<path to input file> +output=<path to output dir>
 """
 if __name__ == "__main__":
     main()

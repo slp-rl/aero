@@ -1,6 +1,6 @@
 from torch import nn
 import torch
-from torch.nn.utils import weight_norm, spectral_norm
+from torch.nn.utils.parametrizations import weight_norm, spectral_norm
 from torch.nn import Conv1d, AvgPool1d, Conv2d
 import torch.nn.functional as F
 
