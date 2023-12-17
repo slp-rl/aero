@@ -1,7 +1,7 @@
 # AERO
 **Audio Super Resolution in the Spectral Domain**
 
-This is the official PyTorch implemenation of *AERO: Audio Super Resolution in the Spectral Domain*: [paper](https://arxiv.org/abs/2211.12232), [project page](https://pages.cs.huji.ac.il/adiyoss-lab/aero/).
+This is a modified verioo of the official PyTorch implemenation of *AERO: Audio Super Resolution in the Spectral Domain*: [paper](https://arxiv.org/abs/2211.12232), [project page](https://pages.cs.huji.ac.il/adiyoss-lab/aero/).
 
 Checkpoint files are available! Details below.
 
@@ -127,7 +127,6 @@ e.g. for upsampling from 4kHz to 16kHz, with `n_fft=512` and `hop_length=64`:
 
 ```
 python predict.py \
-  dset=4-16 \
   experiment=aero_4-16_512_64 \
   +filename=<absolute path to input file> \
   +output=<absolute path to output directory>
