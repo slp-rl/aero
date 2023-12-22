@@ -437,6 +437,11 @@ class Solver(object):
                 losses['generator'].update({'l1': F.l1_loss(pr_time, hr_time)})
             if 'l2' in self.args.losses:
                 losses['generator'].update({'l2': F.mse_loss(pr_time, hr_time)})
+            if 'dc_offset'  in self.args.losses:
+                pr_offset = torch.mean(pr_time)
+                hr_offset = torch.mean(hr_time)
+                dc_loss = abs((pr_offset - hr_offset) / 2) #max loss is -1 to 1
+                losses['generator'].update({'dc_offset': dc_loss })
             if 'stft' in self.args.losses:
                 stft_loss = self._get_stft_loss(pr_time, hr_time)
                 losses['generator'].update({'stft': stft_loss})
