@@ -1,19 +1,19 @@
 # AERO
 **Audio Super Resolution in the Spectral Domain**
 
-This is a modified verioo of the official PyTorch implemenation of *AERO: Audio Super Resolution in the Spectral Domain*: [paper](https://arxiv.org/abs/2211.12232), [project page](https://pages.cs.huji.ac.il/adiyoss-lab/aero/).
+This is a modified version of the official PyTorch implemenation of *AERO: Audio Super Resolution in the Spectral Domain*: [paper](https://arxiv.org/abs/2211.12232), [project page](https://pages.cs.huji.ac.il/adiyoss-lab/aero/).
 
 Checkpoint files are available! Details below.
 
 ## Requirements
 
 Install requirements specified in `requirements.txt`:  
-```pip install -r requirments.txt```
+```pip install -r requirements.txt```
 
-We ran our code on CUDA/11.3, we therefore installed pytorch/torchvision/torchaudio with the following:
+We ran our code on CUDA/12.1, we therefore installed pytorch/torchvision/torchaudio with the following:
 
 ```
-pip install torch==1.12.1+cu113 torchvision==0.13.1+cu113 torchaudio==0.12.1 --extra-index-url https://download.pytorch.org/whl/cu113
+pip install torch==2.1.2+cu121 torchvision==0.16.2+cu121 torchaudio==2.1.2 --extra-index-url https://download.pytorch.org/whl/cu121
 ```
 
 Our code uses [hydra](https://hydra.cc/) to set parameters to different experiments.
