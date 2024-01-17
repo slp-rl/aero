@@ -81,6 +81,10 @@ class Solver(object):
         self.samples_dir = args.samples_dir  # Where to save samples
 
         self.num_prints = args.num_prints  # Number of times to log per epoch
+        self.dc_offset_loss_factor = args.dc_offset_loss_factor if 'dc_offset_loss_factor' in args else 25
+        self.l1_loss_factor = args.l1_loss_factor if 'l1_loss_factor' in args else 100
+        self.l2_loss_factor = args.l2_loss_factor if 'l2_loss_factor' in args else 100
+        self.melgan_loss_factor = args.melgan_loss_factor if 'melgan_loss_factor' in args else 0.005
 
         if 'stft' in self.args.losses:
             self.mrstftloss = MultiResolutionSTFTLoss(factor_sc=args.stft_sc_factor,
@@ -434,13 +438,13 @@ class Solver(object):
         losses = {'generator': {}, 'discriminator': {}}
         with torch.autograd.set_detect_anomaly(True):
             if 'l1' in self.args.losses:
-                losses['generator'].update({'l1': F.l1_loss(pr_time, hr_time)})
+                losses['generator'].update({'l1': self.l1_loss_factor * F.l1_loss(pr_time, hr_time)})
             if 'l2' in self.args.losses:
-                losses['generator'].update({'l2': F.mse_loss(pr_time, hr_time)})
+                losses['generator'].update({'l2': self.l2_loss_factor * F.mse_loss(pr_time, hr_time)})
             if 'dc_offset'  in self.args.losses:
                 pr_offset = torch.mean(pr_time)
                 hr_offset = torch.mean(hr_time)
-                dc_loss = abs((pr_offset - hr_offset) / 2) #max loss is -1 to 1
+                dc_loss = self.dc_offset_loss_factor * abs((pr_offset - hr_offset) / 2) #max loss is -1 to 1
                 losses['generator'].update({'dc_offset': dc_loss })
             if 'stft' in self.args.losses:
                 stft_loss = self._get_stft_loss(pr_time, hr_time)
@@ -500,10 +504,10 @@ class Solver(object):
     def _get_melgan_discriminator_loss(self, discriminator_fake, discriminator_real):
         discriminator_loss = 0
         for scale in discriminator_fake:
-            discriminator_loss += F.relu(1 + scale[-1]).mean()
+            discriminator_loss += self.melgan_loss_factor * F.relu(1 + scale[-1]).mean()
 
         for scale in discriminator_real:
-            discriminator_loss += F.relu(1 - scale[-1]).mean()
+            discriminator_loss += self.melgan_loss_factor * F.relu(1 - scale[-1]).mean()
         return discriminator_loss
 
     def _get_melgan_generator_loss(self, discriminator_fake, discriminator_real):
@@ -514,11 +518,11 @@ class Solver(object):
 
         for i in range(self.args.experiment.melgan_discriminator.num_D):
             for j in range(len(discriminator_fake[i]) - 1):
-                features_loss += weights * F.l1_loss(discriminator_fake[i][j], discriminator_real[i][j].detach())
+                features_loss += self.melgan_loss_factor * weights * F.l1_loss(discriminator_fake[i][j], discriminator_real[i][j].detach())
 
         adversarial_loss = 0
         for scale in discriminator_fake:
-            adversarial_loss += F.relu(1 - scale[-1]).mean()
+            adversarial_loss += self.melgan_loss_factor * F.relu(1 - scale[-1]).mean()
 
         if 'only_adversarial_loss' in self.args.experiment and self.args.experiment.only_adversarial_loss:
             return {'adversarial': adversarial_loss}
@@ -526,7 +530,7 @@ class Solver(object):
         if 'only_features_loss' in self.args.experiment and self.args.experiment.only_features_loss:
             return {'features': self.args.experiment.features_loss_lambda * features_loss}
 
-        return {'adversarial': adversarial_loss,
+        return {'adversarial': adversarial_loss ,
                 'features': self.args.experiment.features_loss_lambda * features_loss}
 
 
