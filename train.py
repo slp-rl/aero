@@ -88,22 +88,25 @@ def run(args):
             model.cuda()
 
     # optimizer
+    optimizers = {}
     if args.optim == "adam":
-        optimizer = torch.optim.Adam(models['generator'].parameters(), lr=args.lr, betas=(0.9, args.beta2))
+        if 'adversarial' in args.experiment and args.experiment.adversarial:
+            optimizer = torch.optim.Adam(
+                itertools.chain(models['generator'].parameters())
+                , lr=args.lr, betas=(0.9, args.beta2))
+            disc_lr = args.disc_lr if 'disc_lr' in args else args.lr
+            disc_optimizer = torch.optim.Adam(
+                itertools.chain(*[models[disc_name].parameters() for disc_name in
+                                args.experiment.discriminator_models]),
+                disc_lr, betas=(0.9, args.beta2))
+            optimizers.update({'optimizer': optimizer})
+            optimizers.update({'disc_optimizer': disc_optimizer})
+        else:
+            optimizer = torch.optim.Adam(models['generator'].parameters(), lr=args.lr, betas=(0.9, args.beta2))
+            optimizers.update({'optimizer': optimizer})
     else:
         logger.fatal('Invalid optimizer %s', args.optim)
         os._exit(1)
-
-    optimizers = {'optimizer': optimizer}
-
-
-    if 'adversarial' in args.experiment and args.experiment.adversarial:
-        disc_optimizer = torch.optim.Adam(
-            itertools.chain(*[models[disc_name].parameters() for disc_name in
-                              args.experiment.discriminator_models]),
-            args.lr, betas=(0.9, args.beta2))
-        optimizers.update({'disc_optimizer': disc_optimizer})
-
 
     # Construct Solver
     solver = Solver(data, models, optimizers, args)

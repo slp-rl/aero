@@ -19,7 +19,8 @@ from src.utils import bold
 logger = logging.getLogger(__name__)
 
 
-SEGMENT_DURATION_SEC = 10
+SEGMENT_DURATION_SEC = 5
+SEGMENT_OVERLAP_SAMPLES = 2048
 
 def _load_model(args):
     model_name = args.experiment.model
@@ -38,6 +39,11 @@ def _load_model(args):
         model.load_state_dict(package[SERIALIZE_KEY_MODELS]['generator'][SERIALIZE_KEY_STATE])
 
     return model
+
+def crossfade_and_blend(out_clip, in_clip):
+    fade_out = torchaudio.transforms.Fade(0,SEGMENT_OVERLAP_SAMPLES)
+    fade_in = torchaudio.transforms.Fade(SEGMENT_OVERLAP_SAMPLES, 0)
+    return fade_out(out_clip) + fade_in(in_clip)
 
 
 @hydra.main(config_path="conf", config_name="main_config", version_base="1.1")  # for latest version of hydra=1.0
@@ -75,11 +81,20 @@ def main(args):
     model.eval()
     pred_start = time.time()
     with torch.no_grad():
+        previous_chunk = None
         for i, lr_chunk in enumerate(lr_chunks):
-            pr_chunk = model(lr_chunk.unsqueeze(0).to(device)).squeeze(0)
+            pr_chunk = None
+            if previous_chunk is not None:
+                combined_chunk = torch.cat((previous_chunk[...,-SEGMENT_OVERLAP_SAMPLES:], lr_chunk), 1)
+                pr_combined_chunk = model(combined_chunk.unsqueeze(0).to(device)).squeeze(0)
+                pr_chunk = pr_combined_chunk[...,SEGMENT_OVERLAP_SAMPLES:]
+                pr_chunks[-1][...,-SEGMENT_OVERLAP_SAMPLES:] = crossfade_and_blend(pr_chunks[-1][...,-SEGMENT_OVERLAP_SAMPLES:], pr_combined_chunk.cpu()[...,:SEGMENT_OVERLAP_SAMPLES] )
+            else:
+                pr_chunk = model(lr_chunk.unsqueeze(0).to(device)).squeeze(0)
             logger.info(f'lr chunk {i} shape: {lr_chunk.shape}')
             logger.info(f'pr chunk {i} shape: {pr_chunk.shape}')
             pr_chunks.append(pr_chunk.cpu())
+            previous_chunk = lr_chunk
 
     pred_duration = time.time() - pred_start
     logger.info(f'prediction duration: {pred_duration}')
