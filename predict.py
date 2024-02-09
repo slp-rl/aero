@@ -29,6 +29,7 @@ def _load_model(args):
     package = torch.load(checkpoint_file, 'cpu')
     load_best = args.continue_best
     if  'state' in package.keys(): #raw model file
+        logger.info(bold(f'Loading model {model_name} from file.'))
         model.load_state_dict(package[SERIALIZE_KEY_STATE])
     elif load_best:
         logger.info(bold(f'Loading model {model_name} from best state.'))
