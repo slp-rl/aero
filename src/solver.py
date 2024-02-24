@@ -85,6 +85,10 @@ class Solver(object):
         self.l1_loss_factor = args.l1_loss_factor if 'l1_loss_factor' in args else 100
         self.l2_loss_factor = args.l2_loss_factor if 'l2_loss_factor' in args else 100
         self.melgan_loss_factor = args.melgan_loss_factor if 'melgan_loss_factor' in args else 0.005
+        self.msd_loss_factor = args.msd_loss_factor if 'msd_loss_factor' in args else 0.1
+        self.mpd_loss_factor = args.mpd_loss_factor if 'mpd_loss_factor' in args else 0.1
+
+        self.floatFormat = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float32
 
         if 'stft' in self.args.losses:
             self.mrstftloss = MultiResolutionSTFTLoss(factor_sc=args.stft_sc_factor,
@@ -280,6 +284,7 @@ class Solver(object):
     def _run_one_epoch(self, epoch, cross_valid=False):
         total_losses = {}
         total_loss = 0
+        losses = None
         data_loader = self.tr_loader if not cross_valid else self.cv_loader
 
         # get a different order for distributed training, otherwise this will get ignored
@@ -294,57 +299,59 @@ class Solver(object):
 
         enumeratedLogprog = enumerate(logprog)
         for i, data in enumeratedLogprog:
-
-            lr, hr = [x.to(self.device) for x in data]
-
-            if return_spec:
-                pr_time, pr_spec = self.dmodel(lr, return_spec=return_spec)
-                if cross_valid:
-                    pr_time = match_signal(pr_time, hr.shape[-1])
-
-                hr_spec = self.dmodel._spec(hr, scale=True)
-
-                hr_reprs = {'time': hr, 'spec': hr_spec}
-                pr_reprs = {'time': pr_time, 'spec': pr_spec}
-            else:
-                pr_time = self.dmodel(lr)
-                if cross_valid:
-                    pr_time = match_signal(pr_time, hr.shape[-1])
-
-                hr_reprs = {'time': hr}
-                pr_reprs = {'time': pr_time}
-
-            losses = self._get_losses(hr_reprs, pr_reprs)
             total_generator_loss = 0
-            for loss_name, loss in losses['generator'].items():
-                total_generator_loss += loss
+            with torch.autocast(device_type="cuda", dtype=self.floatFormat):
+
+                lr, hr = [x.to(self.device) for x in data]
+
+                if return_spec:
+                    pr_time, pr_spec = self.dmodel(lr, return_spec=return_spec)
+                    if cross_valid:
+                        pr_time = match_signal(pr_time, hr.shape[-1])
+
+                    hr_spec = self.dmodel._spec(hr, scale=True)
+
+                    hr_reprs = {'time': hr, 'spec': hr_spec}
+                    pr_reprs = {'time': pr_time, 'spec': pr_spec}
+                else:
+                    pr_time = self.dmodel(lr)
+                    if cross_valid:
+                        pr_time = match_signal(pr_time, hr.shape[-1])
+
+                    hr_reprs = {'time': hr}
+                    pr_reprs = {'time': pr_time}
+
+                losses = self._get_losses(hr_reprs, pr_reprs)
+                
+                for loss_name, loss in losses['generator'].items():
+                    total_generator_loss += loss
+
+                total_loss += total_generator_loss.item()
+                for loss_name, loss in losses['generator'].items():
+                    total_loss_name = 'generator_' + loss_name
+                    if total_loss_name in total_losses:
+                        total_losses[total_loss_name] += loss.item()
+                    else:
+                        total_losses[total_loss_name] = loss.item()
+
+                for loss_name, loss in losses['discriminator'].items():
+                    total_loss_name = 'discriminator_' + loss_name
+                    if total_loss_name in total_losses:
+                        total_losses[total_loss_name] += loss.item()
+                    else:
+                        total_losses[total_loss_name] = loss.item()
+
+                logprog.update(total_loss=format(total_loss / (i + 1), ".5f"))
+                # Just in case, clear some memory
+                if return_spec:
+                    del pr_spec, hr_spec
+                del pr_reprs, hr_reprs, pr_time, hr, lr
 
             # optimize model in training mode
             if not cross_valid:
                 self._optimize(total_generator_loss)
                 if self.adversarial_mode:
                     self._optimize_adversarial(losses['discriminator'])
-
-            total_loss += total_generator_loss.item()
-            for loss_name, loss in losses['generator'].items():
-                total_loss_name = 'generator_' + loss_name
-                if total_loss_name in total_losses:
-                    total_losses[total_loss_name] += loss.item()
-                else:
-                    total_losses[total_loss_name] = loss.item()
-
-            for loss_name, loss in losses['discriminator'].items():
-                total_loss_name = 'discriminator_' + loss_name
-                if total_loss_name in total_losses:
-                    total_losses[total_loss_name] += loss.item()
-                else:
-                    total_losses[total_loss_name] = loss.item()
-
-            logprog.update(total_loss=format(total_loss / (i + 1), ".5f"))
-            # Just in case, clear some memory
-            if return_spec:
-                del pr_spec, hr_spec
-            del pr_reprs, hr_reprs, pr_time, hr, lr
 
         avg_losses = {'total': total_loss / (i + 1)}
         avg_losses.update({'evaluation': total_loss / (i + 1)})
@@ -582,13 +589,13 @@ class Solver(object):
 
 
         if 'only_adversarial_loss' in self.args.experiment and self.args.experiment.only_adversarial_loss:
-            return {'adversarial': g_adv_loss}, d_loss
+            return {'adversarial': self.msd_loss_factor * g_adv_loss}, d_loss
 
         if 'only_features_loss' in self.args.experiment and self.args.experiment.only_features_loss:
-            return {'features': self.args.experiment.features_loss_lambda * g_feat_loss}, d_loss
+            return {'features': self.msd_loss_factor * self.args.experiment.features_loss_lambda * g_feat_loss}, d_loss
 
-        return {'adversarial': g_adv_loss,
-                'features': self.args.experiment.features_loss_lambda * g_feat_loss}, d_loss
+        return {'adversarial': self.msd_loss_factor * g_adv_loss,
+                'features': self.msd_loss_factor * self.args.experiment.features_loss_lambda * g_feat_loss}, d_loss
 
 
     def _get_mpd_adversarial_loss(self, pr, hr):
@@ -604,13 +611,13 @@ class Solver(object):
         g_adv_loss = generator_loss(y_df_hat_g)
 
         if 'only_adversarial_loss' in self.args.experiment and self.args.experiment.only_adversarial_loss:
-            return {'adversarial': g_adv_loss}, d_loss
+            return {'adversarial': self.mpd_loss_factor * g_adv_loss}, d_loss
 
         if 'only_features_loss' in self.args.experiment and self.args.experiment.only_features_loss:
-            return {'features': self.args.experiment.features_loss_lambda * g_feat_loss}, d_loss
+            return {'features': self.mpd_loss_factor * self.args.experiment.features_loss_lambda * g_feat_loss}, d_loss
 
-        return {'adversarial': g_adv_loss,
-                'features': self.args.experiment.features_loss_lambda * g_feat_loss}, d_loss
+        return {'adversarial': self.mpd_loss_factor * g_adv_loss,
+                'features': self.mpd_loss_factor * self.args.experiment.features_loss_lambda * g_feat_loss}, d_loss
 
 
     def _optimize(self, loss):
