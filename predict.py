@@ -19,7 +19,8 @@ from src.utils import bold
 logger = logging.getLogger(__name__)
 
 
-SEGMENT_DURATION_SEC = 10
+SEGMENT_DURATION_SEC = 5
+SEGMENT_OVERLAP_RATIO = 0.25
 
 def _load_model(args):
     model_name = args.experiment.model
@@ -27,18 +28,26 @@ def _load_model(args):
     model = modelFactory.get_model(args)['generator']
     package = torch.load(checkpoint_file, 'cpu')
     load_best = args.continue_best
-    if load_best:
+    if  'state' in package.keys(): #raw model file
+        logger.info(bold(f'Loading model {model_name} from file.'))
+        model.load_state_dict(package[SERIALIZE_KEY_STATE])
+    elif load_best:
         logger.info(bold(f'Loading model {model_name} from best state.'))
         model.load_state_dict(
-            package[SERIALIZE_KEY_BEST_STATES][SERIALIZE_KEY_MODELS]['generator'][SERIALIZE_KEY_STATE])
+            package[SERIALIZE_KEY_BEST_STATES]['generator'])
     else:
         logger.info(bold(f'Loading model {model_name} from last state.'))
         model.load_state_dict(package[SERIALIZE_KEY_MODELS]['generator'][SERIALIZE_KEY_STATE])
 
     return model
 
+def crossfade_and_blend(out_clip, in_clip, segment_overlap_samples):
+    fade_out = torchaudio.transforms.Fade(0,segment_overlap_samples)
+    fade_in = torchaudio.transforms.Fade(segment_overlap_samples, 0)
+    return fade_out(out_clip) + fade_in(in_clip)
 
-@hydra.main(config_path="conf", config_name="main_config")  # for latest version of hydra=1.0
+
+@hydra.main(config_path="conf", config_name="main_config", version_base="1.1")  # for latest version of hydra=1.0
 def main(args):
     global __file__
     __file__ = hydra.utils.to_absolute_path(__file__)
@@ -70,14 +79,26 @@ def main(args):
 
     pr_chunks = []
 
+    lr_segment_overlap_samples = int(sr*SEGMENT_OVERLAP_RATIO*SEGMENT_DURATION_SEC) 
+    hr_segment_overlap_samples = int(args.experiment.hr_sr*SEGMENT_OVERLAP_RATIO*SEGMENT_DURATION_SEC)
+
     model.eval()
     pred_start = time.time()
     with torch.no_grad():
+        previous_chunk = None
         for i, lr_chunk in enumerate(lr_chunks):
-            pr_chunk = model(lr_chunk.unsqueeze(0).to(device)).squeeze(0)
+            pr_chunk = None
+            if previous_chunk is not None:
+                combined_chunk = torch.cat((previous_chunk[...,-lr_segment_overlap_samples:], lr_chunk), 1)
+                pr_combined_chunk = model(combined_chunk.unsqueeze(0).to(device)).squeeze(0)
+                pr_chunk = pr_combined_chunk[...,hr_segment_overlap_samples:]
+                pr_chunks[-1][...,-hr_segment_overlap_samples:] = crossfade_and_blend(pr_chunks[-1][...,-hr_segment_overlap_samples:], pr_combined_chunk.cpu()[...,:hr_segment_overlap_samples],hr_segment_overlap_samples)
+            else:
+                pr_chunk = model(lr_chunk.unsqueeze(0).to(device)).squeeze(0)
             logger.info(f'lr chunk {i} shape: {lr_chunk.shape}')
             logger.info(f'pr chunk {i} shape: {pr_chunk.shape}')
             pr_chunks.append(pr_chunk.cpu())
+            previous_chunk = lr_chunk
 
     pred_duration = time.time() - pred_start
     logger.info(f'prediction duration: {pred_duration}')
@@ -95,7 +116,7 @@ def main(args):
 
 """
 Need to add filename and output to args.
-Usage: python predict.py <dset> <experiment> +filename=<path to input file> +output=<path to output dir>
+Usage: python predict.py <experiment> +filename=<path to input file> +output=<path to output dir>
 """
 if __name__ == "__main__":
     main()

@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from torch.nn.utils import weight_norm
+from torch.nn.utils.parametrizations import weight_norm
 
 from src.models.snake import Snake
 from src.models.utils import unfold

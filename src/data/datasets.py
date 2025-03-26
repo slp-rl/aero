@@ -5,6 +5,7 @@ This code is based on Facebook's HDemucs code: https://github.com/facebookresear
 import json
 import logging
 import os
+import random
 
 import torch
 from tqdm import tqdm
@@ -82,7 +83,7 @@ class PrHrSet(Dataset):
 class LrHrSet(Dataset):
     def __init__(self, json_dir, lr_sr, hr_sr, stride=None, segment=None,
                  pad=True, with_path=False, stft=False, win_len=64, hop_len=16, n_fft=4096, complex_as_channels=True,
-                 upsample=True):
+                 upsample=True, channels=1, vary_volume=False):
         """__init__.
         :param json_dir: directory containing both hr.json and lr.json
         :param stride: the stride used for splitting audio sequences in seconds
@@ -103,6 +104,7 @@ class LrHrSet(Dataset):
         self.stft = stft
         self.with_path = with_path
         self.upsample = upsample
+        self.vary_volume = vary_volume
 
         if self.stft:
             self.window_length = int(self.hr_sr / 1000 * win_len)  # 64 ms
@@ -127,13 +129,18 @@ class LrHrSet(Dataset):
         hr_length = segment * hr_sr if segment else None
 
         match_files(lr, hr)
-        self.lr_set = Audioset(lr, sample_rate=lr_sr, length=lr_length, stride=lr_stride, pad=pad, channels=1,
-                               with_path=with_path)
-        self.hr_set = Audioset(hr, sample_rate=hr_sr, length=hr_length, stride=hr_stride, pad=pad, channels=1,
-                               with_path=with_path)
+
+        stride_offset_ratio = random.uniform(0,1)
+
+        self.lr_set = Audioset(lr, sample_rate=lr_sr, length=lr_length, stride=lr_stride, pad=pad, channels=channels,
+                               with_path=with_path, stride_offset_ratio=stride_offset_ratio)
+        self.hr_set = Audioset(hr, sample_rate=hr_sr, length=hr_length, stride=hr_stride, pad=pad, channels=channels,
+                               with_path=with_path, stride_offset_ratio=stride_offset_ratio)
         assert len(self.hr_set) == len(self.lr_set)
 
     def __getitem__(self, index):
+        self.update_stride_offset()
+
         if self.with_path:
             hr_sig, hr_path = self.hr_set[index]
             lr_sig, lr_path = self.lr_set[index]
@@ -143,6 +150,10 @@ class LrHrSet(Dataset):
         if self.upsample:
             lr_sig = resample(lr_sig, self.lr_sr, self.hr_sr)
             lr_sig = match_signal(lr_sig, hr_sig.shape[-1])
+        if self.vary_volume:
+            volumeAdjustment = torchaudio.transforms.Vol(random.uniform(0.5, 1))
+            hr_sig = volumeAdjustment(hr_sig)
+            lr_sig = volumeAdjustment(lr_sig)
 
         if self.stft:
             hr_sig = torch.view_as_real(self.spectrogram(hr_sig))
@@ -159,6 +170,12 @@ class LrHrSet(Dataset):
 
     def __len__(self):
         return len(self.lr_set)
+    
+    def update_stride_offset(self):
+        stride_offset_ratio = random.uniform(0,1)
+        self.lr_set.update_stride_offset(stride_offset_ratio)
+        self.hr_set.update_stride_offset(stride_offset_ratio)
+
 
 
 if __name__ == "__main__":

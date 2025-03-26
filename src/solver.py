@@ -69,10 +69,13 @@ class Solver(object):
         self.cross_valid = args.cross_valid
         self.cross_valid_every = args.cross_valid_every
         self.checkpoint = args.checkpoint
+        self.pretrained = args.pretrained if 'pretrained' in args else False
         if self.checkpoint:
             self.checkpoint_file = Path(args.checkpoint_file)
             self.best_file = Path(args.best_file)
             logger.debug("Checkpoint will be saved to %s", self.checkpoint_file.resolve())
+        if self.pretrained:
+            self.pretrained_file = Path(args.pretrained_file)
         self.history_file = args.history_file
 
         self.best_states = None
@@ -81,10 +84,22 @@ class Solver(object):
         self.samples_dir = args.samples_dir  # Where to save samples
 
         self.num_prints = args.num_prints  # Number of times to log per epoch
+        self.dc_offset_loss_factor = args.dc_offset_loss_factor if 'dc_offset_loss_factor' in args else 1
+        self.l1_loss_factor = args.l1_loss_factor if 'l1_loss_factor' in args else 1
+        self.l2_loss_factor = args.l2_loss_factor if 'l2_loss_factor' in args else 1
+        self.melgan_loss_factor = args.melgan_loss_factor if 'melgan_loss_factor' in args else 1
+        self.msd_loss_factor = args.msd_loss_factor if 'msd_loss_factor' in args else 1
+        self.mpd_loss_factor = args.mpd_loss_factor if 'mpd_loss_factor' in args else 1
+
+        self.floatFormat = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float32
 
         if 'stft' in self.args.losses:
             self.mrstftloss = MultiResolutionSTFTLoss(factor_sc=args.stft_sc_factor,
-                                                  factor_mag=args.stft_mag_factor).to(self.device)
+                                                  factor_mag=args.stft_mag_factor,magnitude_weight_shift=args.stft_mag_weight_shift).to(self.device)
+        if 'stftcustom' in self.args.losses:
+            self.mrstftlosscustom = MultiResolutionSTFTLoss(factor_sc=args.stft_sc_factor,
+                                                  factor_mag=args.stft_mag_factor,start_interval=args.stftcustom_start,
+                                                  end_interval=args.stftcustom_end,magnitude_weight_shift=args.stft_mag_weight_shift).to(self.device)
 
         if 'discriminator_model' in self.args.experiment and \
                 self.args.experiment.discriminator_model == 'hifi':
@@ -104,12 +119,13 @@ class Solver(object):
         if load_best:
             for name, model_package in package[SERIALIZE_KEY_BEST_STATES][SERIALIZE_KEY_MODELS].items():
                 self.models[name].load_state_dict(model_package[SERIALIZE_KEY_STATE])
-        else:
+        elif SERIALIZE_KEY_MODELS in package and SERIALIZE_KEY_OPTIMIZERS in package:
             for name, model_package in package[SERIALIZE_KEY_MODELS].items():
                 self.models[name].load_state_dict(model_package[SERIALIZE_KEY_STATE])
             for name, opt_package in package[SERIALIZE_KEY_OPTIMIZERS].items():
                 self.optimizers[name].load_state_dict(opt_package)
-
+        elif SERIALIZE_KEY_STATE in package: #Pretrained generator model
+            self.models['generator'].load_state_dict(package[SERIALIZE_KEY_STATE])
 
     def _reset(self):
         """_reset."""
@@ -123,14 +139,18 @@ class Solver(object):
             load_from = self.continue_from
             load_best = self.args.continue_best
             keep_history = self.args.keep_history
+        elif self.pretrained and self.pretrained_file.exists():
+            load_from = self.pretrained_file
+            keep_history = False
 
         if load_from:
-            logger.info(f'Loading checkpoint model: {load_from}')
+            logger.info(f'Loading model information from: {load_from}')
             package = torch.load(load_from, 'cpu')
             self._load(package, load_best)
             if keep_history:
                 self.history = package[SERIALIZE_KEY_HISTORY]
-            self.best_states = package[SERIALIZE_KEY_BEST_STATES]
+            if SERIALIZE_KEY_BEST_STATES in package:
+                self.best_states = package[SERIALIZE_KEY_BEST_STATES]
 
 
     def train(self):
@@ -148,10 +168,8 @@ class Solver(object):
             mb = n_params * 4 / 2 ** 20
             logger.info(f"{name}: parameters: {n_params}, size: {mb} MB")
 
-        torch.set_num_threads(1)
-
         best_loss = None
-        self.best_states = {}
+        if self.best_states == None: self.best_states = {}
 
         for epoch in range(len(self.history), self.epochs):
             # Train one epoch
@@ -198,8 +216,9 @@ class Solver(object):
                     logger.info(bold('New best valid loss %.4f'), evaluation_loss)
                     self.best_states = self._copy_models_states()
                     # a bit weird that we don't save/load optimizers' best states. Should we?
-
-
+            elif not self.cross_valid and (len(self.best_states) == 0 or losses['total_loss'] < min(pull_metric(self.history, 'total_loss'))):
+                    logger.info(bold('New best total loss %.4f'), losses['total_loss'])
+                    self.best_states = self._copy_models_states()
 
             metrics = {**losses, **valid_losses}
 
@@ -277,6 +296,7 @@ class Solver(object):
     def _run_one_epoch(self, epoch, cross_valid=False):
         total_losses = {}
         total_loss = 0
+        losses = None
         data_loader = self.tr_loader if not cross_valid else self.cv_loader
 
         # get a different order for distributed training, otherwise this will get ignored
@@ -289,57 +309,61 @@ class Solver(object):
         # return_spec can be used to debug model and see explicit spectral output of model
         return_spec = 'return_spec' in self.args.experiment and self.args.experiment.return_spec
 
-        for i, data in enumerate(logprog):
-            lr, hr = [x.to(self.device) for x in data]
-
-            if return_spec:
-                pr_time, pr_spec = self.dmodel(lr, return_spec=return_spec)
-                if cross_valid:
-                    pr_time = match_signal(pr_time, hr.shape[-1])
-
-                hr_spec = self.dmodel._spec(hr, scale=True)
-
-                hr_reprs = {'time': hr, 'spec': hr_spec}
-                pr_reprs = {'time': pr_time, 'spec': pr_spec}
-            else:
-                pr_time = self.dmodel(lr)
-                if cross_valid:
-                    pr_time = match_signal(pr_time, hr.shape[-1])
-
-                hr_reprs = {'time': hr}
-                pr_reprs = {'time': pr_time}
-
-            losses = self._get_losses(hr_reprs, pr_reprs)
+        enumeratedLogprog = enumerate(logprog)
+        for i, data in enumeratedLogprog:
             total_generator_loss = 0
-            for loss_name, loss in losses['generator'].items():
-                total_generator_loss += loss
+            with torch.autocast(device_type="cuda", dtype=self.floatFormat):
+
+                lr, hr = [x.to(self.device) for x in data]
+
+                if return_spec:
+                    pr_time, pr_spec = self.dmodel(lr, return_spec=return_spec)
+                    if cross_valid:
+                        pr_time = match_signal(pr_time, hr.shape[-1])
+
+                    hr_spec = self.dmodel._spec(hr, scale=True)
+
+                    hr_reprs = {'time': hr, 'spec': hr_spec}
+                    pr_reprs = {'time': pr_time, 'spec': pr_spec}
+                else:
+                    pr_time = self.dmodel(lr)
+                    if cross_valid:
+                        pr_time = match_signal(pr_time, hr.shape[-1])
+
+                    hr_reprs = {'time': hr}
+                    pr_reprs = {'time': pr_time}
+
+                losses = self._get_losses(hr_reprs, pr_reprs)
+                
+                for loss_name, loss in losses['generator'].items():
+                    total_generator_loss += loss
+
+                total_loss += total_generator_loss.item()
+                for loss_name, loss in losses['generator'].items():
+                    total_loss_name = 'generator_' + loss_name
+                    if total_loss_name in total_losses:
+                        total_losses[total_loss_name] += loss.item()
+                    else:
+                        total_losses[total_loss_name] = loss.item()
+
+                for loss_name, loss in losses['discriminator'].items():
+                    total_loss_name = 'discriminator_' + loss_name
+                    if total_loss_name in total_losses:
+                        total_losses[total_loss_name] += loss.item()
+                    else:
+                        total_losses[total_loss_name] = loss.item()
+
+                logprog.update(total_loss=format(total_loss / (i + 1), ".5f"))
+                # Just in case, clear some memory
+                if return_spec:
+                    del pr_spec, hr_spec
+                del pr_reprs, hr_reprs, pr_time, hr, lr
 
             # optimize model in training mode
             if not cross_valid:
                 self._optimize(total_generator_loss)
                 if self.adversarial_mode:
                     self._optimize_adversarial(losses['discriminator'])
-
-            total_loss += total_generator_loss.item()
-            for loss_name, loss in losses['generator'].items():
-                total_loss_name = 'generator_' + loss_name
-                if total_loss_name in total_losses:
-                    total_losses[total_loss_name] += loss.item()
-                else:
-                    total_losses[total_loss_name] = loss.item()
-
-            for loss_name, loss in losses['discriminator'].items():
-                total_loss_name = 'discriminator_' + loss_name
-                if total_loss_name in total_losses:
-                    total_losses[total_loss_name] += loss.item()
-                else:
-                    total_losses[total_loss_name] = loss.item()
-
-            logprog.update(total_loss=format(total_loss / (i + 1), ".5f"))
-            # Just in case, clear some memory
-            if return_spec:
-                del pr_spec, hr_spec
-            del pr_reprs, hr_reprs, pr_time, hr, lr
 
         avg_losses = {'total': total_loss / (i + 1)}
         avg_losses.update({'evaluation': total_loss / (i + 1)})
@@ -363,7 +387,8 @@ class Solver(object):
 
         total_filenames = []
 
-        for i, data in enumerate(logprog):
+        enumeratedLogprog = enumerate(logprog)
+        for i, data in enumeratedLogprog:
             (lr, lr_path), (hr, hr_path) = data
             lr = lr.to(self.device)
             hr = hr.to(self.device)
@@ -432,12 +457,20 @@ class Solver(object):
         losses = {'generator': {}, 'discriminator': {}}
         with torch.autograd.set_detect_anomaly(True):
             if 'l1' in self.args.losses:
-                losses['generator'].update({'l1': F.l1_loss(pr_time, hr_time)})
+                losses['generator'].update({'l1': self.l1_loss_factor * F.l1_loss(pr_time, hr_time)})
             if 'l2' in self.args.losses:
-                losses['generator'].update({'l2': F.mse_loss(pr_time, hr_time)})
+                losses['generator'].update({'l2': self.l2_loss_factor * F.mse_loss(pr_time, hr_time)})
+            if 'dc_offset'  in self.args.losses:
+                pr_offset = torch.mean(pr_time)
+                hr_offset = torch.mean(hr_time)
+                dc_loss = self.dc_offset_loss_factor * abs((pr_offset - hr_offset) / 2) #max loss is -1 to 1
+                losses['generator'].update({'dc_offset': dc_loss })
             if 'stft' in self.args.losses:
                 stft_loss = self._get_stft_loss(pr_time, hr_time)
                 losses['generator'].update({'stft': stft_loss})
+            if 'stftcustom' in self.args.losses:
+                stftcustom_loss = self._get_stftcustom_loss(pr_time, hr_time)
+                losses['generator'].update({'stftcustom': stftcustom_loss})
 
             if self.adversarial_mode:
                 if 'msd_melgan' in self.args.experiment.discriminator_models:
@@ -447,7 +480,7 @@ class Solver(object):
                     if not self.args.experiment.only_adversarial_loss:
                         losses['generator'].update({'features_melgan': generator_losses['features']})
                     losses['discriminator'].update({'msd_melgan': discriminator_loss})
-                if 'msd_hifi' in self.args.experiment.discriminator_models:
+                if 'msd' in self.args.experiment.discriminator_models:
                     generator_losses, discriminator_loss = self._get_msd_adversarial_loss(pr_time, hr_time)
                     if not self.args.experiment.only_features_loss:
                         losses['generator'].update({'adversarial_msd': generator_losses['adversarial']})
@@ -468,9 +501,20 @@ class Solver(object):
         return losses
 
     def _get_stft_loss(self, pr, hr):
-        sc_loss, mag_loss = self.mrstftloss(pr.squeeze(1), hr.squeeze(1))
+        sc_loss, mag_loss = self.mrstftloss(
+            pr.reshape([pr.shape[0], pr.shape[1] * pr.shape[2]]), 
+            hr.reshape([hr.shape[0], hr.shape[1] * hr.shape[2]])
+            )
         stft_loss = sc_loss + mag_loss
         return stft_loss
+    
+    def _get_stftcustom_loss(self, pr, hr):
+        sc_loss, mag_loss = self.mrstftlosscustom(
+            pr.reshape([pr.shape[0], pr.shape[1] * pr.shape[2]]), 
+            hr.reshape([hr.shape[0], hr.shape[1] * hr.shape[2]])
+            )
+        stftcustom_loss = sc_loss + mag_loss
+        return stftcustom_loss
 
     def _get_melgan_adversarial_loss(self, pr, hr):
 
@@ -489,11 +533,17 @@ class Solver(object):
 
     def _get_melgan_discriminator_loss(self, discriminator_fake, discriminator_real):
         discriminator_loss = 0
-        for scale in discriminator_fake:
-            discriminator_loss += F.relu(1 + scale[-1]).mean()
+        #for scale in discriminator_fake:
+        #    discriminator_loss += self.melgan_loss_factor * F.relu(1 + scale[-1]).mean()
 
-        for scale in discriminator_real:
-            discriminator_loss += F.relu(1 - scale[-1]).mean()
+        #for scale in discriminator_real:
+        #    discriminator_loss += self.melgan_loss_factor * F.relu(1 - scale[-1]).mean()
+
+        for dg, dr in zip(discriminator_fake, discriminator_real):
+           discriminator_loss += self.melgan_loss_factor * torch.mean(
+               torch.sigmoid(dr[-1])-torch.sigmoid(dg[-1])
+               )
+        
         return discriminator_loss
 
     def _get_melgan_generator_loss(self, discriminator_fake, discriminator_real):
@@ -504,11 +554,11 @@ class Solver(object):
 
         for i in range(self.args.experiment.melgan_discriminator.num_D):
             for j in range(len(discriminator_fake[i]) - 1):
-                features_loss += weights * F.l1_loss(discriminator_fake[i][j], discriminator_real[i][j].detach())
+                features_loss += self.melgan_loss_factor * weights * F.l1_loss(discriminator_fake[i][j], discriminator_real[i][j].detach())
 
         adversarial_loss = 0
         for scale in discriminator_fake:
-            adversarial_loss += F.relu(1 - scale[-1]).mean()
+            adversarial_loss += -self.melgan_loss_factor * torch.mean(torch.sigmoid(scale[-1]))
 
         if 'only_adversarial_loss' in self.args.experiment and self.args.experiment.only_adversarial_loss:
             return {'adversarial': adversarial_loss}
@@ -516,7 +566,7 @@ class Solver(object):
         if 'only_features_loss' in self.args.experiment and self.args.experiment.only_features_loss:
             return {'features': self.args.experiment.features_loss_lambda * features_loss}
 
-        return {'adversarial': adversarial_loss,
+        return {'adversarial': adversarial_loss ,
                 'features': self.args.experiment.features_loss_lambda * features_loss}
 
 
@@ -555,7 +605,7 @@ class Solver(object):
 
 
     def _get_msd_adversarial_loss(self, pr, hr):
-        msd = self.dmodels['msd_hifi']
+        msd = self.dmodels['msd']
 
         # discriminator loss
         y_ds_hat_r, y_ds_hat_g, _, _ = msd(hr, pr.detach())
@@ -568,13 +618,13 @@ class Solver(object):
 
 
         if 'only_adversarial_loss' in self.args.experiment and self.args.experiment.only_adversarial_loss:
-            return {'adversarial': g_adv_loss}, d_loss
+            return {'adversarial': self.msd_loss_factor * g_adv_loss}, d_loss
 
         if 'only_features_loss' in self.args.experiment and self.args.experiment.only_features_loss:
-            return {'features': self.args.experiment.features_loss_lambda * g_feat_loss}, d_loss
+            return {'features': self.msd_loss_factor * self.args.experiment.features_loss_lambda * g_feat_loss}, d_loss
 
-        return {'adversarial': g_adv_loss,
-                'features': self.args.experiment.features_loss_lambda * g_feat_loss}, d_loss
+        return {'adversarial': self.msd_loss_factor * g_adv_loss,
+                'features': self.msd_loss_factor * self.args.experiment.features_loss_lambda * g_feat_loss}, d_loss
 
 
     def _get_mpd_adversarial_loss(self, pr, hr):
@@ -590,13 +640,13 @@ class Solver(object):
         g_adv_loss = generator_loss(y_df_hat_g)
 
         if 'only_adversarial_loss' in self.args.experiment and self.args.experiment.only_adversarial_loss:
-            return {'adversarial': g_adv_loss}, d_loss
+            return {'adversarial': self.mpd_loss_factor * g_adv_loss}, d_loss
 
         if 'only_features_loss' in self.args.experiment and self.args.experiment.only_features_loss:
-            return {'features': self.args.experiment.features_loss_lambda * g_feat_loss}, d_loss
+            return {'features': self.mpd_loss_factor * self.args.experiment.features_loss_lambda * g_feat_loss}, d_loss
 
-        return {'adversarial': g_adv_loss,
-                'features': self.args.experiment.features_loss_lambda * g_feat_loss}, d_loss
+        return {'adversarial': self.mpd_loss_factor * g_adv_loss,
+                'features': self.mpd_loss_factor * self.args.experiment.features_loss_lambda * g_feat_loss}, d_loss
 
 
     def _optimize(self, loss):

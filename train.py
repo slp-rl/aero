@@ -24,6 +24,7 @@ def run(args):
     from src.data.datasets import LrHrSet
     from src.solver import Solver
     logger.info(f'calling distrib.init')
+    
     distrib.init(args)
 
     _init_wandb_run(args)
@@ -50,9 +51,16 @@ def run(args):
     assert args.experiment.batch_size % distrib.world_size == 0
     args.experiment.batch_size //= distrib.world_size
 
+    channels = 1
+    if args.experiment.model == 'aero':
+       channels = args.experiment.aero.in_channels
+    elif args.experiment.model == 'seanet':
+       channels = args.experiment.seanet.in_channels
+
     # Building datasets and loaders
     tr_dataset = LrHrSet(args.dset.train, args.experiment.lr_sr, args.experiment.hr_sr,
-                         args.experiment.stride, args.experiment.segment, upsample=args.experiment.upsample)
+                         args.experiment.stride, args.experiment.segment, upsample=args.experiment.upsample,
+                         channels=channels, vary_volume=args.vary_volume)
     tr_loader = distrib.loader(tr_dataset, batch_size=args.experiment.batch_size, shuffle=True,
                                num_workers=args.num_workers)
 
@@ -61,14 +69,16 @@ def run(args):
 
     if args.dset.valid:
         cv_dataset = LrHrSet(args.dset.valid, args.experiment.lr_sr, args.experiment.hr_sr,
-                            stride=None, segment=None, upsample=args.experiment.upsample)
+                            stride=None, segment=None, upsample=args.experiment.upsample,
+                            channels=channels)
         cv_loader = distrib.loader(cv_dataset, batch_size=1, shuffle=False, num_workers=args.num_workers)
     else:
         cv_loader = None
 
     if args.dset.test:
         tt_dataset = LrHrSet(args.dset.test, args.experiment.lr_sr, args.experiment.hr_sr,
-                             stride=None, segment=None, with_path=True, upsample=args.experiment.upsample)
+                             stride=None, segment=None, with_path=True, upsample=args.experiment.upsample,
+                             channels=channels)
         tt_loader = distrib.loader(tt_dataset, batch_size=1, shuffle=False, num_workers=args.num_workers)
     else:
         tt_loader = None
@@ -79,22 +89,25 @@ def run(args):
             model.cuda()
 
     # optimizer
+    optimizers = {}
     if args.optim == "adam":
-        optimizer = torch.optim.Adam(models['generator'].parameters(), lr=args.lr, betas=(0.9, args.beta2))
+        if 'adversarial' in args.experiment and args.experiment.adversarial:
+            optimizer = torch.optim.Adam(
+                itertools.chain(models['generator'].parameters())
+                , lr=args.lr, betas=(args.beta1, args.beta2))
+            disc_lr = args.disc_lr if 'disc_lr' in args else args.lr
+            disc_optimizer = torch.optim.Adam(
+                itertools.chain(*[models[disc_name].parameters() for disc_name in
+                                args.experiment.discriminator_models]),
+                disc_lr, betas=(args.beta1, args.beta2),maximize=True)
+            optimizers.update({'optimizer': optimizer})
+            optimizers.update({'disc_optimizer': disc_optimizer})
+        else:
+            optimizer = torch.optim.Adam(models['generator'].parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
+            optimizers.update({'optimizer': optimizer})
     else:
         logger.fatal('Invalid optimizer %s', args.optim)
         os._exit(1)
-
-    optimizers = {'optimizer': optimizer}
-
-
-    if 'adversarial' in args.experiment and args.experiment.adversarial:
-        disc_optimizer = torch.optim.Adam(
-            itertools.chain(*[models[disc_name].parameters() for disc_name in
-                              args.experiment.discriminator_models]),
-            args.lr, betas=(0.9, args.beta2))
-        optimizers.update({'disc_optimizer': disc_optimizer})
-
 
     # Construct Solver
     solver = Solver(data, models, optimizers, args)
@@ -129,7 +142,7 @@ def _main(args):
     wandb.finish()
 
 
-@hydra.main(config_path="conf", config_name="main_config")  # for latest version of hydra=1.0
+@hydra.main(config_path="conf", config_name="main_config", version_base="1.1")  # for latest version of hydra=1.0
 def main(args):
     try:
         _main(args)
