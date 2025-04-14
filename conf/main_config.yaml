@@ -14,9 +14,11 @@ show: 0   # just show the model and its size and exit
 # log results
 log_results: true
 
+vary_volume: true
 # Checkpointing, by default automatically load last checkpoint
 checkpoint: true
 continue_from: '' # Path the a checkpoint.th file to start from.
+pretrained: false
 # this is not used in the name of the experiment!
 # so use a dummy=something not to mixup experiment.
 continue_best: false  # continue from best, not last state if continue_from is set.
@@ -65,6 +67,7 @@ stft_sc_factor: .5
 stft_mag_factor: .5
 epochs: 125
 
+stft_mag_weight_shift: 0.0
 # Experiment launching, distributed
 ddp: false
 ddp_backend: nccl

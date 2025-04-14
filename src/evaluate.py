@@ -112,7 +112,8 @@ def evaluate_on_saved_data(args, data_loader, epoch):
 
     with torch.no_grad():
         iterator = LogProgress(logger, data_loader, name="Eval estimates")
-        for i, data in enumerate(iterator):
+        enumeratedIterator = enumerate(iterator)
+        for i, data in enumeratedIterator:
             metrics_i = evaluate_lr_hr_pr_data(data, wandb_n_files_to_log, files_to_log, epoch, args)
 
             total_lsd += metrics_i['lsd']
@@ -156,7 +157,8 @@ def evaluate(args, data_loader, epoch, model):
 
     with torch.no_grad():
         iterator = LogProgress(logger, data_loader, name="Eval estimates")
-        for i, data in enumerate(iterator):
+        enumeratedIterator = enumerate(iterator)
+        for i, data in enumeratedIterator:
 
             metrics_i = evaluate_lr_hr_data(data, model, wandb_n_files_to_log, files_to_log, epoch, args)
             total_lsd += metrics_i['lsd']

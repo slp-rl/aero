@@ -128,4 +128,12 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# Various Generated Files/Folders
+egs/*
+outputs/*
+src/data/**/*
+*.th
+wandb
+history.json
+
 slurm-*.out

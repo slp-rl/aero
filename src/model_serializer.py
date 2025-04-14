@@ -36,7 +36,7 @@ def _serialize_optimizers(optimizers):
     return serialized_optimizers
 
 
-def serialize(models, optimizers, history, best_states, args):
+def serialize(models, optimizers, history, best_states, args, save_latest_generator=True):
     checkpoint_file = Path(args.checkpoint_file)
     best_file = Path(args.best_file)
 
@@ -50,7 +50,16 @@ def serialize(models, optimizers, history, best_states, args):
     torch.save(package, tmp_path)
     # renaming is sort of atomic on UNIX (not really true on NFS)
     # but still less chances of leaving a half written checkpoint behind.
-    os.rename(tmp_path, checkpoint_file)
+    os.replace(tmp_path, checkpoint_file)
+
+    if save_latest_generator:
+        generatorPackage = {}
+        generatorPackage[SERIALIZE_KEY_STATE]=package[SERIALIZE_KEY_MODELS]['generator'][SERIALIZE_KEY_STATE]
+        model_filename = "generator_latest.th"
+        tmp_path = os.path.join(checkpoint_file.parent, model_filename) + ".tmp"
+        torch.save(generatorPackage, tmp_path)
+        model_path = Path(checkpoint_file.parent / model_filename)
+        os.replace(tmp_path, model_path)
 
     # Saving only the latest best model.
     models = package[SERIALIZE_KEY_MODELS]
@@ -60,4 +69,4 @@ def serialize(models, optimizers, history, best_states, args):
         tmp_path = os.path.join(best_file.parent, model_filename) + ".tmp"
         torch.save(models[model_name], tmp_path)
         model_path = Path(best_file.parent / model_filename)
-        os.rename(tmp_path, model_path)
+        os.replace(tmp_path, model_path)

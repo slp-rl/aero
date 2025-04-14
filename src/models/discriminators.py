@@ -1,6 +1,6 @@
 from torch import nn
 import torch
-from torch.nn.utils import weight_norm, spectral_norm
+from torch.nn.utils.parametrizations import weight_norm, spectral_norm
 from torch.nn import Conv1d, AvgPool1d, Conv2d
 import torch.nn.functional as F
 
@@ -12,12 +12,12 @@ from src.utils import capture_init
 # Melgan discriminator
 
 class NLayerDiscriminator(nn.Module):
-    def __init__(self, ndf, n_layers, downsampling_factor):
+    def __init__(self, ndf, n_layers, downsampling_factor, channels=1):
         super().__init__()
         model = nn.ModuleDict()
         model["layer_0"] = nn.Sequential(
             nn.ReflectionPad1d(7),
-            WNConv1d(1, ndf, kernel_size=15),
+            WNConv1d(channels, ndf, kernel_size=15),
             nn.LeakyReLU(0.2, True),
         )
 
@@ -58,13 +58,13 @@ class NLayerDiscriminator(nn.Module):
 
 class Discriminator(nn.Module):
     @capture_init
-    def __init__(self, num_D, ndf, n_layers, downsampling_factor):
+    def __init__(self, num_D, ndf, n_layers, downsampling_factor, channels=1):
         super().__init__()
         self.model = nn.ModuleDict()
         self.num_D = num_D
         for i in range(num_D):
             self.model[f"disc_{i}"] = NLayerDiscriminator(
-                ndf, n_layers, downsampling_factor
+                ndf, n_layers, downsampling_factor, channels=channels
             )
 
         self.downsample = AvgPool1d(4, stride=2, padding=1, count_include_pad=False)
@@ -88,12 +88,12 @@ def get_padding(kernel_size, dilation=1):
 
 class DiscriminatorP(torch.nn.Module):
     @capture_init
-    def __init__(self, period, kernel_size=5, stride=3, use_spectral_norm=False, hidden=32):
+    def __init__(self, period, kernel_size=5, stride=3, use_spectral_norm=False, hidden=32, channels=1):
         super(DiscriminatorP, self).__init__()
         self.period = period
         norm_f = weight_norm if use_spectral_norm == False else spectral_norm
         self.convs = nn.ModuleList([
-            norm_f(Conv2d(1, hidden, (kernel_size, 1), (stride, 1), padding=(get_padding(5, 1), 0))),
+            norm_f(Conv2d(channels, hidden, (kernel_size, 1), (stride, 1), padding=(get_padding(5, 1), 0))),
             norm_f(Conv2d(hidden, hidden * 4, (kernel_size, 1), (stride, 1), padding=(get_padding(5, 1), 0))),
             norm_f(Conv2d(hidden * 4, hidden * 16, (kernel_size, 1), (stride, 1), padding=(get_padding(5, 1), 0))),
             norm_f(Conv2d(hidden * 16, hidden * 32, (kernel_size, 1), (stride, 1), padding=(get_padding(5, 1), 0))),
@@ -125,10 +125,10 @@ class DiscriminatorP(torch.nn.Module):
 
 class MultiPeriodDiscriminator(torch.nn.Module):
     @capture_init
-    def __init__(self, hidden=32, periods=[2, 3, 5, 7, 11]):
+    def __init__(self, hidden=32, periods=[2, 3, 5, 7, 11], channels=1):
         super(MultiPeriodDiscriminator, self).__init__()
         self.discriminators = nn.ModuleList([
-            DiscriminatorP(period, hidden=hidden) for period in periods
+            DiscriminatorP(period, hidden=hidden, channels=channels) for period in periods
         ])
 
     def forward(self, y, y_hat):
@@ -149,12 +149,12 @@ class MultiPeriodDiscriminator(torch.nn.Module):
 
 class DiscriminatorS(torch.nn.Module):
     @capture_init
-    def __init__(self, use_spectral_norm=False, hidden=128):
+    def __init__(self, use_spectral_norm=False, hidden=128, channels=1):
         super(DiscriminatorS, self).__init__()
         norm_f = weight_norm if use_spectral_norm == False else spectral_norm
 
         self.convs = nn.ModuleList([
-            norm_f(Conv1d(1, hidden, 15, 1, padding=7)),
+            norm_f(Conv1d(channels, hidden, 15, 1, padding=7)),
             norm_f(Conv1d(hidden, hidden, 41, 2, groups=4, padding=20)),
             norm_f(Conv1d(hidden, hidden * 2, 41, 2, groups=16, padding=20)),
             norm_f(Conv1d(hidden * 2, hidden * 4, 41, 4, groups=16, padding=20)),
@@ -179,10 +179,10 @@ class DiscriminatorS(torch.nn.Module):
 
 class MultiScaleDiscriminator(torch.nn.Module):
     @capture_init
-    def __init__(self, hidden=64, num_D=3):
+    def __init__(self, hidden=64, num_D=3, channels=1):
         super(MultiScaleDiscriminator, self).__init__()
         self.discriminators = nn.ModuleList([
-            DiscriminatorS(use_spectral_norm=i == 0, hidden=hidden) for i in range(num_D)
+            DiscriminatorS(use_spectral_norm=i == 0, hidden=hidden, channels=channels) for i in range(num_D)
         ])
         self.meanpools = nn.ModuleList([
             AvgPool1d(4, 2, padding=2),
@@ -224,9 +224,10 @@ def discriminator_loss(disc_real_outputs, disc_generated_outputs):
     # r_losses = []
     # g_losses = []
     for dr, dg in zip(disc_real_outputs, disc_generated_outputs):
-        r_loss = torch.mean((1 - dr) ** 2)
-        g_loss = torch.mean(dg ** 2)
-        loss += (r_loss + g_loss)
+        #r_loss = torch.mean((1 - dr) ** 2)
+        #g_loss = torch.mean(dg ** 2)
+        #loss += (r_loss + g_loss)
+        loss += torch.mean(torch.sigmoid(dr)-torch.sigmoid(dg))
         # r_losses.append(r_loss.item())
         # g_losses.append(g_loss.item())
 
@@ -237,7 +238,7 @@ def generator_loss(disc_outputs):
     loss = 0
     # gen_losses = []
     for dg in disc_outputs:
-        l = torch.mean((1 - dg) ** 2)
+        l = -torch.mean(torch.sigmoid(dg))
         # gen_losses.append(l)
         loss += l
 

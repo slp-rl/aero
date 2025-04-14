@@ -1,20 +1,21 @@
 # AERO
 **Audio Super Resolution in the Spectral Domain**
 
-This is the official PyTorch implemenation of *AERO: Audio Super Resolution in the Spectral Domain*: [paper](https://arxiv.org/abs/2211.12232), [project page](https://pages.cs.huji.ac.il/adiyoss-lab/aero/).
+This is a modified version of the official PyTorch implemenation of *AERO: Audio Super Resolution in the Spectral Domain*: [paper](https://arxiv.org/abs/2211.12232), [project page](https://pages.cs.huji.ac.il/adiyoss-lab/aero/).
 
 Checkpoint files are available! Details below.
 
 ## Requirements
 
 Install requirements specified in `requirements.txt`:  
-```pip install -r requirments.txt```
+```pip install -r requirements.txt```
 
-We ran our code on CUDA/11.3, we therefore installed pytorch/torchvision/torchaudio with the following:
+We ran our code on CUDA/12.4, we therefore installed pytorch/torchvision/torchaudio with the following:
 
 ```
-pip install torch==1.12.1+cu113 torchvision==0.13.1+cu113 torchaudio==0.12.1 --extra-index-url https://download.pytorch.org/whl/cu113
+pip install torch==2.4.1+cu124 torchvision==0.19.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cu124
 ```
+Torch 2.3.1 appears to have an autocast issue that prevents it from working with bfloat16, at least for this project.
 
 Our code uses [hydra](https://hydra.cc/) to set parameters to different experiments.
 
@@ -127,7 +128,6 @@ e.g. for upsampling from 4kHz to 16kHz, with `n_fft=512` and `hop_length=64`:
 
 ```
 python predict.py \
-  dset=4-16 \
   experiment=aero_4-16_512_64 \
   +filename=<absolute path to input file> \
   +output=<absolute path to output directory>
@@ -137,6 +137,13 @@ python predict.py \
 
 To use pre-trained models, one can download checkpoints
 from [here](https://drive.google.com/drive/folders/1KuVJNkR7lZddvufmNsx-uAIluvb5XQ2L?usp=share_link).
+
+Thank you for [@fmac2000](https://github.com/fmac2000) for providing checkpoints for the 16->48 kHz configuration! They are now included in the provided checkpoint folder.
+
+## Additional models for this modified project
+
+[AM Radio Super Resolution](https://www.mediafire.com/folder/orqm1wxjyikjp/test-v1)
+[FM Radio Super Resolution](https://huggingface.co/sereich/FMRadioSR)
 
 To link to checkpoint when testing or predicting, override/set path under `checkpoint_file:<path>`
 in `conf/main_config.yaml.`  

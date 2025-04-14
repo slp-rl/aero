@@ -296,7 +296,7 @@ class Aero(nn.Module):
             dconv_mode: if 1: dconv in encoder only, 2: decoder only, 3: both.
             dconv_depth: depth of residual DConv branch.
             dconv_comp: compression of DConv branch.
-            dconv_freq_attn: adds freq attention layers in DConv branch starting at this layer.
+            enc_freq_attn: adds freq attention layers in DConv branch starting at this layer.
             dconv_time_attn: adds time attention layers in DConv branch starting at this layer.
             dconv_lstm: adds a LSTM layer in DConv branch starting at this layer.
             dconv_init: initial scale for the DConv branch LayerScale.

@@ -15,7 +15,7 @@ def get_model(args):
         if 'msd_melgan' in args.experiment.discriminator_models:
             discriminator = Discriminator(**args.experiment.melgan_discriminator)
             models.update({'msd_melgan': discriminator})
-        if 'msd_hifi' in args.experiment.discriminator_models:
+        if 'msd' in args.experiment.discriminator_models:
             msd = MultiScaleDiscriminator(**args.experiment.msd)
             models.update({'msd': msd})
         if 'mpd' in args.experiment.discriminator_models:

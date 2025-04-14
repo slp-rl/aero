@@ -9,7 +9,7 @@ from torch.nn import functional as F
 class Audioset:
     def __init__(self, files=None, length=None, stride=None,
                  pad=True, with_path=False, sample_rate=None,
-                 channels=None):
+                 channels=None, stride_offset_ratio = 0):
         """
         files should be a list [(file, length)]
         """
@@ -20,6 +20,9 @@ class Audioset:
         self.with_path = with_path
         self.sample_rate = sample_rate
         self.channels = channels
+        self.stride_offset =  int(stride_offset_ratio * stride) if (stride != length) else 0
+
+        widest_range = max(self.stride, self.length)
 
         for file, file_length in self.files:
             if length is None:
@@ -27,9 +30,9 @@ class Audioset:
             elif file_length < length:
                 examples = 1 if pad else 0
             elif pad:
-                examples = int(math.ceil((file_length - self.length) / self.stride) + 1)
+                examples = int(math.ceil((file_length - widest_range) / widest_range) - 1)
             else:
-                examples = (file_length - self.length) // self.stride + 1
+                examples = (file_length - widest_range) // widest_range - 1
             self.num_examples.append(examples)
 
     def __len__(self):
@@ -43,15 +46,11 @@ class Audioset:
             num_frames = 0
             offset = 0
             if self.length is not None:
-                offset = self.stride * index
+                offset = self.stride * index + self.stride_offset
                 num_frames = self.length
-            if torchaudio.get_audio_backend() in ['soundfile', 'sox_io']:
-                out, sr = torchaudio.load(str(file),
-                                          frame_offset=offset,
-                                          num_frames=num_frames or -1)
-            else:
-                out, sr = torchaudio.load(str(file), offset=offset, num_frames=num_frames)
-
+            out, sr = torchaudio.load(str(file),
+                                        frame_offset=offset,
+                                        num_frames=num_frames or -1)
 
             if sr != self.sample_rate:
                 raise RuntimeError(f"Expected {file} to have sample rate of "
@@ -65,3 +64,7 @@ class Audioset:
                 return out, file
             else:
                 return out
+            
+    def update_stride_offset(self, new_ratio):
+        assert(new_ratio >= 0 and new_ratio <= 1)
+        self.stride_offset = int(new_ratio * self.stride) if (self.stride != self.length) else 0
